@@ -1,2 +1,0 @@
-#for AWINIC AW869X Haptic
-obj-$(CONFIG_AW869X_HAPTIC) += aw869x.o
