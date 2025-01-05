@@ -2624,61 +2624,61 @@ int aw869x_parse_dt(struct device *dev, struct aw869x *aw869x,
 	struct qti_hap_effect *effect;
 	int rc = 0, tmp, i = 0, j;
 
-	val = of_property_read_u32(np, "aw869x_vib_mode", &aw869x->info.mode);
+	val = of_property_read_u32(np, "aw8697_vib_mode", &aw869x->info.mode);
 	if (val != 0)
-		aw_info("aw869x_vib_mode not found\n");
-	val = of_property_read_u32(np, "aw869x_vib_f0_pre",
+		aw_info("aw8697_vib_mode not found\n");
+	val = of_property_read_u32(np, "aw8697_vib_f0_pre",
 				   &aw869x->info.f0_pre);
 	if (val != 0)
-		aw_info("aw869x_vib_f0_pre not found\n");
+		aw_info("aw8697_vib_f0_pre not found\n");
 	val =
-	    of_property_read_u32(np, "aw869x_vib_f0_cali_percen",
+	    of_property_read_u32(np, "aw8697_vib_f0_cali_percen",
 				 &aw869x->info.f0_cali_percen);
 	if (val != 0)
-		aw_info("aw869x_vib_f0_cali_percen not found\n");
+		aw_info("aw8697_vib_f0_cali_percen not found\n");
 	val =
-	    of_property_read_u32(np, "aw869x_vib_cont_drv_lev",
+	    of_property_read_u32(np, "aw8697_vib_cont_drv_lev",
 				 &aw869x->info.cont_drv_lvl);
 	if (val != 0)
-		aw_info("aw869x_vib_cont_drv_lev not found\n");
+		aw_info("aw8697_vib_cont_drv_lev not found\n");
 	val =
-	    of_property_read_u32(np, "aw869x_vib_cont_drv_lvl_ov",
+	    of_property_read_u32(np, "aw8697_vib_cont_drv_lvl_ov",
 				 &aw869x->info.cont_drv_lvl_ov);
 	if (val != 0)
-		aw_info("aw869x_vib_cont_drv_lvl_ov not found\n");
-	val = of_property_read_u32(np, "aw869x_vib_cont_td",
+		aw_info("aw8697_vib_cont_drv_lvl_ov not found\n");
+	val = of_property_read_u32(np, "aw8697_vib_cont_td",
 				   &aw869x->info.cont_td);
 	if (val != 0)
-		aw_info("aw869x_vib_cont_td not found\n");
+		aw_info("aw8697_vib_cont_td not found\n");
 	val =
-	    of_property_read_u32(np, "aw869x_vib_cont_zc_thr",
+	    of_property_read_u32(np, "aw8697_vib_cont_zc_thr",
 				 &aw869x->info.cont_zc_thr);
 	if (val != 0)
-		aw_info("aw869x_vib_cont_zc_thr not found\n");
+		aw_info("aw8697_vib_cont_zc_thr not found\n");
 	val =
-	    of_property_read_u32(np, "aw869x_vib_cont_num_brk",
+	    of_property_read_u32(np, "aw8697_vib_cont_num_brk",
 				 &aw869x->info.cont_num_brk);
 	if (val != 0)
-		aw_info("aw869x_vib_cont_num_brk not found\n");
-	val = of_property_read_u32(np, "aw869x_vib_f0_coeff",
+		aw_info("aw8697_vib_cont_num_brk not found\n");
+	val = of_property_read_u32(np, "aw8697_vib_f0_coeff",
 				   &aw869x->info.f0_coeff);
 	if (val != 0)
-		aw_info("aw869x_vib_f0_coeff not found\n");
+		aw_info("aw8697_vib_f0_coeff not found\n");
 
-	val = of_property_read_u32(np, "aw869x_vib_tset", &aw869x->info.tset);
+	val = of_property_read_u32(np, "aw8697_vib_tset", &aw869x->info.tset);
 	if (val != 0)
 		aw_info("%s vib_tset not found\n", __func__);
-	val = of_property_read_u32(np, "aw869x_vib_r_spare",
+	val = of_property_read_u32(np, "aw8697_vib_r_spare",
 				   &aw869x->info.r_spare);
 	if (val != 0)
 		aw_info("%s vib_r_spare not found\n", __func__);
-	val = of_property_read_u32_array(np, "aw869x_vib_bstdbg",
+	val = of_property_read_u32_array(np, "aw8697_vib_bstdbg",
 					 bstdbg, ARRAY_SIZE(bstdbg));
 	if (val != 0)
 		aw_info("%s vib_bstdbg not found\n", __func__);
 	memcpy(aw869x->info.bstdbg, bstdbg, sizeof(bstdbg));
 
-	val = of_property_read_u32_array(np, "aw869x_vib_f0_trace_parameter",
+	val = of_property_read_u32_array(np, "aw8697_vib_f0_trace_parameter",
 					 f0_trace_parameter,
 					 ARRAY_SIZE(f0_trace_parameter));
 	if (val != 0)
@@ -2686,7 +2686,7 @@ int aw869x_parse_dt(struct device *dev, struct aw869x *aw869x,
 	memcpy(aw869x->info.f0_trace_parameter, f0_trace_parameter,
 	       sizeof(f0_trace_parameter));
 	val =
-	    of_property_read_u32_array(np, "aw869x_vib_bemf_config",
+	    of_property_read_u32_array(np, "aw8697_vib_bemf_config",
 				       bemf_config,
 				       ARRAY_SIZE(bemf_config));
 	if (val != 0)
@@ -2694,24 +2694,24 @@ int aw869x_parse_dt(struct device *dev, struct aw869x *aw869x,
 	memcpy(aw869x->info.bemf_config, bemf_config, sizeof(bemf_config));
 
 	val =
-	    of_property_read_u32_array(np, "aw869x_vib_trig_config",
+	    of_property_read_u32_array(np, "aw8697_vib_trig_config",
 				       trig_config,
 				       ARRAY_SIZE(trig_config));
 	if (val != 0)
 		aw_info("%s vib_trig_config not found\n", __func__);
 	memcpy(aw869x->info.trig_config, trig_config, sizeof(trig_config));
 	val =
-	    of_property_read_u32(np, "aw869x_vib_bst_vol_default",
+	    of_property_read_u32(np, "aw8697_vib_bst_vol_default",
 				 &aw869x->info.bst_vol_default);
 	if (val != 0)
 		aw_info("%s vib_bst_vol_default not found\n", __func__);
 	val =
-	    of_property_read_u32(np, "aw869x_vib_bst_vol_ram",
+	    of_property_read_u32(np, "aw8697_vib_bst_vol_ram",
 				 &aw869x->info.bst_vol_ram);
 	if (val != 0)
 		aw_info("%s vib_bst_vol_ram not found\n", __func__);
 	val =
-	    of_property_read_u32(np, "aw869x_vib_bst_vol_rtp",
+	    of_property_read_u32(np, "aw8697_vib_bst_vol_rtp",
 				 &aw869x->info.bst_vol_rtp);
 	if (val != 0)
 		aw_info("%s vib_bst_vol_rtp not found\n", __func__);
