@@ -211,6 +211,7 @@ static int __init disp_get_white_point_x(char *arg)
 	unsigned int x;
 	kstrtouint(arg, 10, &x);
 	panel_white_point_x = x + WHITE_POINT_BASE_X;
+	return 0;
 }
 
 static int __init disp_get_white_point_y(char *arg)
@@ -218,6 +219,7 @@ static int __init disp_get_white_point_y(char *arg)
 	int y;
 	kstrtouint(arg, 10, &y);
 	panel_white_point_y = y + WHITE_POINT_BASE_Y;
+	return 0;
 }
 
 static int __init disp_get_white_point_lv(char *arg)
@@ -225,6 +227,7 @@ static int __init disp_get_white_point_lv(char *arg)
 	int lv;
 	kstrtouint(arg, 10, &lv);
 	panel_white_point_lv = lv;
+	return 0;
 }
 
 static int _lcm_i2c_probe(struct i2c_client *client,const struct i2c_device_id *id)
