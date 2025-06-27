@@ -292,7 +292,7 @@ ifneq ($(filter 6765, $(WLAN_CHIP_ID)),)
     ccflags-y += -DCFG_SUPPORT_DUAL_STA=0
 else ifeq ($(CONFIG_MTK_TC10_FEATURE), y)
     ccflags-y += -DCFG_SUPPORT_DUAL_STA=0
-else ifeq($(CONFIG_MOT_DISABLE_DUAL_STA), y)
+else ifeq ($(CONFIG_MOT_DISABLE_DUAL_STA), y)
     ccflags-y += -DCFG_SUPPORT_DUAL_STA=0
 else
     ccflags-y += -DCFG_SUPPORT_DUAL_STA=1
