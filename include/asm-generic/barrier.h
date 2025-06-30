@@ -216,8 +216,18 @@ do {									\
  *
  * Architectures that do not do load speculation can have this be barrier().
  */
-#ifndef smp_acquire__after_ctrl_dep
-#define smp_acquire__after_ctrl_dep()		smp_rmb()
+#ifndef smp_cond_load_relaxed
+#define smp_cond_load_relaxed(ptr, cond_expr) ({		\
+	typeof(ptr) __PTR = (ptr);				\
+	typeof(*ptr) VAL;					\
+	for (;;) {						\
+		VAL = READ_ONCE(*__PTR);			\
+		if (cond_expr)					\
+			break;					\
+		cpu_relax();					\
+	}							\
+	VAL;							\
+})
 #endif
 
 /**
