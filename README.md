@@ -9,7 +9,21 @@
 2.apt安装:
 
 ```
-sudo apt install -y  gcc-12-aarch64-linux-gnu cpio binutils-aarch64-linux-gnu ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip bc clang bison build-essential ccache curl flex git git-lfs gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev lld
+apt update && apt install -y \
+    gcc-12-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+    ccache automake flex bison gperf build-essential \
+    zip curl zlib1g-dev libxml2-utils libbz2-dev \
+    squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool \
+    make optipng maven libssl-dev pwgen bc \
+    libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
+    libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip \
+    clang git git-lfs gnupg imagemagick libelf-dev \
+    libsdl1.2-dev lzop rsync lld ninja-build \
+    python3 python3-pip
+
+# 可选：降级 GCC 或安装特定 Clang 版本
+# apt install -y gcc-11-aarch64-linux-gnu
+# wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 14
 
 ```
 
