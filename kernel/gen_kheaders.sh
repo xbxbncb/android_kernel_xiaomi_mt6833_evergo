@@ -8,13 +8,29 @@ sfile="$(readlink -f "$0")"
 outdir="$(pwd)"
 tarfile=$1
 cpio_dir=$outdir/$tarfile.tmp
-cpio=$KBUILD_SRC/tools/build/cpio
+# cpio=$KBUILD_SRC/tools/build/cpio 方便编译
+if [ -z "$srctree" ]; then
+    srctree=$(pwd)
+fi
+if [ -z "$KBUILD_SRC" ]; then
+    KBUILD_SRC=$srctree
+fi
+if [ -z "$SRCARCH" ]; then
+    SRCARCH=arm64  # 根据你的目标架构修改
+fi
+# 使用系统 cpio
+cpio=$(which cpio)
 dir_list="
 include/
 arch/$SRCARCH/include/
 "
 
-# Support incremental builds by skipping archive generation
+
+
+
+
+
+#Support incremental builds by skipping archive generation
 # if timestamps of files being archived are not changed.
 
 # This block is useful for debugging the incremental builds.
