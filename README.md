@@ -2,9 +2,9 @@
 由酷安大佬:孤独不能 提供的可编译内核源码
 这里的fork是为了帮助小白可以更快的成功编译
 
-教程:
-方案1:
-### debian12虚拟机💽
+## 教程:
+
+### 方案1:debian12虚拟机💽
 1.安装debian12(网上搜)
 2.apt安装:
 
@@ -42,6 +42,9 @@ ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-lin
 示例:
 ![image](https://github.com/user-attachments/assets/be3bf50f-bf1d-4643-ab5b-022fa075c92d)
 
+
+### 方案2:Github Action
+正在制作。。。。。。
 
 
 Linux kernel
