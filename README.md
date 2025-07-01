@@ -45,8 +45,12 @@ ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-lin
 
 
 ### 方案2:Github Action
-正在制作。。。。。。
-
+1.fork本项目
+2.点击Action
+![image](https://github.com/user-attachments/assets/f5985f53-9d4f-4b0e-a03d-6782214a0041)
+3.点击Kernel Build and Release 然后     Run workflow ！  
+![image](https://github.com/user-attachments/assets/a62eed5e-1766-444c-af30-90b2570e13c3)
+4.首次编译大约20-30min，第二次编译会使用缓存(保存7天)
 
 Linux kernel
 ============
