@@ -35,20 +35,9 @@ jobs:
 
     - name: Build kernel
       run: |
-        export ARCH=arm64
-        # 使用精简命令集
-        make CC="ccache clang" \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          LD=ld.lld \
-          LDFLAGS="-fuse-ld=lld" \
-          -j$(nproc) \
-          evergo_defconfig
+        ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ LD=ld.lld LDFLAGS="-fuse-ld=lld" -k -i  evergo_defconfig
 
-        make CC="ccache clang" \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          LD=ld.lld \
-          LDFLAGS="-fuse-ld=lld" \
-          -j$(nproc)
+        ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ LD=ld.lld LDFLAGS="-fuse-ld=lld" -k -i  -j$(nproc)
 
     - name: Show ccache stats
       run: ccache -s
