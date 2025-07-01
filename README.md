@@ -58,7 +58,7 @@ ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-lin
 ![image](https://github.com/user-attachments/assets/be3bf50f-bf1d-4643-ab5b-022fa075c92d)
 
 
-### 方案2:Github Action
+### 方案2:Github Action(不可用目前)
 1.fork本项目
 2.点击Action
 ![image](https://github.com/user-attachments/assets/f5985f53-9d4f-4b0e-a03d-6782214a0041)
