@@ -7,26 +7,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: debian:bookworm-slim # Debian 12
+      image: debian:bookworm # Debian 12
       options: --privileged # 启用特权模式
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
-    - name: Install newer GCC
-      run: |
-       apt-get update
-       apt-get install -y gcc-10 g++-10
-       update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
-       update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
-
-
+    
     - name: Install dependencies
       run: |
         apt-get update
-        # 精简依赖列表，修复包名问题
+        apt-get -y full-upgrade
         apt-get install -y git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev  g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip bc clang bison build-essential ccache curl flex git git-lfs gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev lld
+    
     - name: Setup ccache
       run: |
         echo "CCACHE_DIR=$(pwd)/.ccache" >> $GITHUB_ENV
