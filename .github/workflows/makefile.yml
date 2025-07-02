@@ -1,38 +1,37 @@
-name: Auto Build Kernel
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
+name: Auto kernel build
+on: [push, pull_request]
 jobs:
   build:
-
-    runs-on: ubuntu-24.0.4-arm
-
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Configure toolchains
-      run: sudo apt install -y bc bison build-essential ccache curl flex git git-lfs gnupg gperf imagemagick libelf-dev liblz4-tool libncurses6 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev clang llvm lld
+      - name: Install ARM64 Toolchain
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu \
+            libc6-dev-arm64-cross
 
-    - name: Build Kernel
-      run: |
-         chmod -R 777 .
-         make -j32 ARCH=arm64 SUBARCH=arm O=out CC="ccache clang" LD=ld.lld CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="--sysroot=/usr/aarch64-linux-gnu -Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ evergo_defconfig
-         make -j32 ARCH=arm64 SUBARCH=arm O=out CC="ccache clang" LD=ld.lld CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="--sysroot=/usr/aarch64-linux-gnu -Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_
+      - name: Build Kernel
+        env:
+          ARCH: arm64
+          CROSS_COMPILE: aarch64-linux-gnu-
+        run: |
+          make -j$(nproc) O=out \
+            CC="ccache clang" \
+            LD=aarch64-linux-gnu-ld \
+            CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+            KCFLAGS="--sysroot=/usr/aarch64-linux-gnu -Wno-unused-variable" \
+            evergo_defconfig
 
-    - name: Git AnyKernel3
-      run: git clone https://github.com/osm0sis/AnyKernel3.git Anykernel3 --depth=1
+          make -j$(nproc) O=out
 
-    - name: Zip AnyKernel3.zip
-      run: |
-         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3
-         zip AnyKernel3.zip AnyKernel3.zip
-
-    - name: Upload AnyKernel3.zip
-      uses: actions/upload-artifact@v4
-      with:
-            name: AnyKernel3.zip
-            path: AnyKernel3.zip
+      - name: Package Artifact
+        run: |
+          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+          zip -r AnyKernel3.zip AnyKernel3/
