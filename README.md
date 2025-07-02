@@ -44,12 +44,39 @@ ccache -M 20G
 
 ```
 #使用默认配置
-ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ LD=ld.lld -k -i  evergo_defconfig
+ARCH=arm64 \
+CROSS_COMPILE=aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+CC="ccache clang" \
+CCACHE_DIR="/home/c/.ccache" \
+CLANG_TRIPLE=aarch64-linux-gnu- \
+LD=ld.lld \
+KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
+make -j$(nproc) O=out evergo_defconfig
+
 
 #配置配置(如果您有开启docker等功能的需要，若没有请不要执行)
-#ARCH=arm64 make menuconfig CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ LD=ld.lld -k -i  
+#ARCH=arm64 \
+CROSS_COMPILE=aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+CC="ccache clang" \
+CCACHE_DIR="/home/c/.ccache" \
+CLANG_TRIPLE=aarch64-linux-gnu- \
+LD=ld.lld \
+KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
+make menuconfig -j$(nproc) O=out
+
+
 #开始编译
-ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ LD=ld.lld -k -i  -j12
+ARCH=arm64 \
+CROSS_COMPILE=aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+CC="ccache clang" \
+CCACHE_DIR="/home/c/.ccache" \
+CLANG_TRIPLE=aarch64-linux-gnu- \
+LD=ld.lld \
+KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
+make -j$(nproc) O=out
 
 ```
 
