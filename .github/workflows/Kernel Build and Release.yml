@@ -10,13 +10,13 @@ jobs:
       image: debian:bookworm  # 使用Debian稳定版
 
     steps:
-    
+
 
 
     - name: 生成发布标签
       id: generate_tag
       run: |
-          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
+          TAG_SUFFIX=$(date -u +"%Y %m %dT %H %M %SZ")
           echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
           echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
 
