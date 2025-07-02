@@ -84,12 +84,6 @@ jobs:
           echo "❌ 错误：未找到内核镜像文件"
           exit 1
         fi
-        
-        # 验证AnyKernel3模板完整性
-        if [ ! -f AnyKernel3/anykernel.sh ]; then
-          echo "❌ 错误：AnyKernel3模板不完整"
-          exit 1
-        fi
 
     - name: 制作刷机包
       run: |
@@ -99,6 +93,12 @@ jobs:
         rm -rf AnyKernel3
         git clone --depth=1 https://github.com/cuicanmx/AnyKernel3.git 
         
+        # 验证AnyKernel3模板完整性
+        if [ ! -f AnyKernel3/anykernel.sh ]; then
+          echo "❌ 错误：AnyKernel3模板不完整"
+          exit 1
+        fi
+
         # 复制内核镜像
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         

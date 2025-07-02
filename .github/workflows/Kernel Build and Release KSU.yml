@@ -84,6 +84,7 @@ jobs:
 
     - name: 验证内核镜像
       run: |
+      
         if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
           echo "❌ 错误：未找到内核镜像文件"
           exit 1
