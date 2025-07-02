@@ -1,82 +1,102 @@
+
 name: Kernel Build and Release
 
 on:
-  workflow_dispatch: # 手动触发
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: debian:bookworm # Debian 12
-      options: --privileged # 启用特权模式
+      image: debian:bookworm
+      options: --privileged
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
+      with:
+        fetch-depth: 0  # 获取完整提交历史
+
     - name: Install dependencies
       run: |
-        dpkg --add-architecture i386
         apt update && apt install -y \
-        gcc-12-aarch64-linux-gnu binutils-aarch64-linux-gnu \
-        ccache automake flex bison gperf build-essential \
-        zip curl zlib1g-dev libxml2-utils libbz2-dev \
-        squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool \
-        make optipng maven libssl-dev pwgen bc \
-        libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
-        libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip \
-        clang git git-lfs gnupg imagemagick libelf-dev \
-        libsdl1.2-dev lzop rsync lld ninja-build \
-        python3 python3-pip
+        bc bison build-essential ccache clang cpio curl flex git git-lfs \
+        gnupg gperf imagemagick  libelf-dev liblz4-tool libncurses5-dev \
+        libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
+        rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make
 
-# 可选：降级 GCC 或安装特定 Clang 版本
-# apt install -y gcc-11-aarch64-linux-gnu
-# wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 14
     - name: Setup ccache
       run: |
-        echo "CCACHE_DIR=$(pwd)/.ccache" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> $GITHUB_ENV
         ccache -M 20G
-        ccache -s
+        ccache -o compression=true
 
     - name: Cache ccache
       uses: actions/cache@v4
       with:
-        path: .ccache
+        path: ${{ env.CCACHE_DIR }}
         key: ${{ runner.os }}-ccache-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-ccache-
 
     - name: Build kernel
       run: |
-        ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ LD=ld.lld  -k -i  evergo_defconfig
+        set -eo pipefail
+        make ARCH=arm64 distclean || true
+        
+        make ARCH=arm64 \
+          CC="ccache clang" \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          LD=ld.lld \
+          CCACHE_DIR="$CCACHE_DIR" \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_  \
+          -j$(nproc) evergo_defconfig
 
-        ARCH=arm64 make CC="ccache clang"  CCACHE_DIR=".cache" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ LD=ld.lld  -k -i  -j$(nproc)
+        make ARCH=arm64 \
+          CC="ccache clang" \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          LD=ld.lld \
+          CCACHE_DIR="$CCACHE_DIR" \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_  \
+          -j$(nproc) 2>&1 | tee build.log
 
-    - name: Show ccache stats
-      run: ccache -s
+    - name: Verify build artifacts
+      run: |
+        [ -f arch/arm64/boot/Image ] || (echo "Kernel image not found"; exit 1)
+        [ -f arch/arm64/boot/dts/*.dtb ] || echo "Warning: No device tree files"
 
     - name: Package artifacts
       run: |
-        mkdir kernel-output
-        cp arch/arm64/boot/* kernel-output/
+        mkdir -p kernel-output
+        cp arch/arm64/boot/Image* kernel-output/
+        cp arch/arm64/boot/dts/**/*.dtb kernel-output/ 2>/dev/null || true
+        cp System.map kernel-output/ || true
         tar -czvf kernel-artifacts.tar.gz kernel-output
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: kernel-binaries
-        path: kernel-artifacts.tar.gz
+        name: kernel-${{ github.run_id }}
+        path: |
+          kernel-artifacts.tar.gz
+          build.log
         retention-days: 7
 
     - name: Create Release
-      id: create_release
+      if: github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: kernel-${{ github.run_id }}
-        name: Kernel Build ${{ github.run_id }}
+        tag_name: kernel-$(date +%Y%m%d-%H%M)
+        name: Kernel Build ${{ github.run_number }}
+        body: |
+          Build log: [build.log](build.log)
+          SHA: ${{ github.sha }}
         files: |
           kernel-artifacts.tar.gz
+          build.log
         draft: false
-        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
