@@ -13,7 +13,6 @@ sudo apt update && sudo apt install -y bc bison build-essential ccache curl flex
 gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5 libncurses5-dev \
 libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool \
 squashfs-tools xsltproc zip zlib1g-dev lld gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cpio clang
-
 ```
 
 3.克隆仓库
@@ -36,15 +35,13 @@ ccache -M 20G
 make ARCH=arm64 \
 CC="ccache clang" \
 CROSS_COMPILE=aarch64-linux-gnu- \
-CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-CCACHE_DIR="/home/c/.ccache" \
-CLANG_TRIPLE=aarch64-linux-gnu- \
 LD=ld.lld \
-KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_  \
--j$(nproc) O=out evergo_defconfig
-```
+KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+-j$(($(nproc) + 1)) evergo_defconfig
 ```
 #配置配置(如果您有开启docker等功能的需要，若没有请不要执行)
+
+```
 #make ARCH=arm64 \
 #CROSS_COMPILE=aarch64-linux-gnu- \
 #CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
@@ -55,18 +52,14 @@ KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-un
 #KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
 # menuconfig -j$(nproc) O=out
 ```
-```
 #开始编译
+```
 make ARCH=arm64 \
-CC="ccache clang" \
-CROSS_COMPILE=aarch64-linux-gnu- \
-CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-CCACHE_DIR="/home/c/.ccache" \
-CLANG_TRIPLE=aarch64-linux-gnu- \
-LD=ld.lld \
-KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
- -j$(nproc) O=out
-
+          CC="ccache clang" \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          LD=ld.lld \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+          -j$(($(nproc) + 1)) evergo_defconfig
 ```
 
 6.编译完成
