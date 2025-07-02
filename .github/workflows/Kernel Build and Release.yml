@@ -4,17 +4,17 @@ on:
   workflow_dispatch:  # 手动触发
     inputs:
       include_ksu:
-        description: "是否集成KernelSU"
+        description: "集成KernelSU支持"
         required: true
         type: boolean
         default: false
       kernel_branch:
-        description: "内核分支（用于KernelSU）"
+        description: "内核源码分支 (默认: ksu)"
         required: false
         type: string
         default: "ksu"
       ksu_repo:
-        description: "KernelSU仓库地址（可选）"
+        description: "KernelSU仓库地址 (默认: https://github.com/tiann/KernelSU)"
         required: false
         type: string
         default: "https://github.com/tiann/KernelSU"
@@ -24,80 +24,115 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: debian:bookworm  # 使用Debian稳定版
+      
+    # 添加超时设置防止挂起
+    timeout-minutes: 120
 
     steps:
+    - name: 显示构建信息
+      run: |
+        echo "🚀 开始内核构建工作流"
+        echo "📅 构建日期: $(date)"
+        echo "🔧 工作流ID: $GITHUB_RUN_ID"
+        echo "🌿 内核分支: ${{ inputs.kernel_branch || '默认分支' }}"
+        echo "🧩 KernelSU: ${{ inputs.include_ksu && '启用' || '禁用' }}"
+        if [ "${{ inputs.include_ksu }}" = "true" ]; then
+          echo "📦 KernelSU仓库: ${{ inputs.ksu_repo }}"
+        fi
+
     - name: 检出代码库
       uses: actions/checkout@v4
       with:
         fetch-depth: 0  # 获取完整提交历史
-        ref: ${{ inputs.kernel_branch != '' && inputs.kernel_branch || 'main' }}  # 使用指定的分支或默认main
+        ref: ${{ inputs.kernel_branch || 'main' }}
+        # 显示检出信息
+        path: kernel-src
+      
+    - name: 记录内核版本信息
+      id: kernel_info
+      working-directory: kernel-src
+      run: |
+        KERNEL_COMMIT=$(git rev-parse --short HEAD)
+        KERNEL_BRANCH=$(git branch --show-current)
+        echo "ℹ️ 内核信息: 分支 $KERNEL_BRANCH, 提交 $KERNEL_COMMIT"
+        echo "KERNEL_COMMIT=$KERNEL_COMMIT" >> $GITHUB_ENV
+        echo "KERNEL_BRANCH=$KERNEL_BRANCH" >> $GITHUB_ENV
+        echo "::set-output name=commit::$KERNEL_COMMIT"
+        echo "::set-output name=branch::$KERNEL_BRANCH"
 
     - name: 安装构建依赖
       run: |
-        apt update && apt install -y \
-        bc bison build-essential ccache clang cpio curl flex git \
-        gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
-        libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
-        rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
-        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make && apt clean
-        
+        echo "🔧 安装构建依赖..."
+        apt-get update -qq
+        apt-get install -y --no-install-recommends \
+          bc bison build-essential ccache clang cpio curl flex git \
+          gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
+          libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
+          rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make
+        apt-get clean
+        rm -rf /var/lib/apt/lists/*
+        echo "✅ 依赖安装完成"
+
     # 添加KernelSU集成步骤
     - name: 集成KernelSU
       if: ${{ inputs.include_ksu == true }}
+      working-directory: kernel-src
       run: |
-        echo "ℹ️ 正在集成KernelSU..."
-        echo "ℹ️ 内核分支: ${{ inputs.kernel_branch }}"
-        echo "ℹ️ KernelSU仓库: ${{ inputs.ksu_repo }}"
+        echo "🧩 正在集成KernelSU..."
+        echo "📦 仓库地址: ${{ inputs.ksu_repo }}"
         
-        # 移除可能已存在的KernelSU目录
+        # 清理可能存在的旧KernelSU
         if [ -d "KernelSU" ]; then
+          echo "🧹 清理旧KernelSU目录..."
           rm -rf KernelSU
-          echo "已移除旧的KernelSU目录"
         fi
         
         # 克隆KernelSU仓库
-        git clone ${{ inputs.ksu_repo }} KernelSU
+        echo "⬇️ 克隆KernelSU仓库..."
+        git clone --depth=1 "${{ inputs.ksu_repo }}" KernelSU
         
-        # 检查是否克隆成功
-        if [ $? -ne 0 ]; then
-          echo "❌ 克隆KernelSU仓库失败"
+        # 验证克隆结果
+        if [ $? -ne 0 ] || [ ! -d "KernelSU" ]; then
+          echo "❌ 错误：KernelSU仓库克隆失败"
           exit 1
         fi
         
-        # 显示克隆的KernelSU版本
+        # 获取KernelSU版本信息
         cd KernelSU
         KSU_VERSION=$(git describe --tags 2>/dev/null || git rev-parse --short HEAD)
         cd ..
-        echo "✅ KernelSU集成完成！版本: $KSU_VERSION"
-        
+        echo "✅ KernelSU集成成功！版本: $KSU_VERSION"
+        echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
+
     - name: 配置ccache缓存
       run: |
-        # 首先创建缓存目录
-        CCACHE_DIR="$GITHUB_WORKSPACE/.ccache"
+        echo "⚙️ 配置ccache缓存..."
+        # 创建缓存目录
+        CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
     
-        # 然后设置环境变量
+        # 设置环境变量
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+        echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+        echo "CCACHE_COMPRESSLEVEL=6" >> $GITHUB_ENV
+        echo "CCACHE_MAXSIZE=20G" >> $GITHUB_ENV
     
-        # 配置ccache
-        ccache -M 20G
-        ccache -o compression=true
-        echo "ℹ️ ccache缓存已配置，目录: $CCACHE_DIR"
+        # 初始化ccache
+        ccache -z
+        echo "✅ ccache配置完成 (目录: $CCACHE_DIR, 大小: 20G)"
 
-    # 优化的缓存策略：使用分支名作为键，提高缓存命中率
     - name: 缓存ccache数据
       uses: actions/cache@v4
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: ${{ runner.os }}-ccache-${{ github.ref }}  # 基于分支名缓存
+        key: ${{ runner.os }}-ccache-${{ env.KERNEL_COMMIT }}
         restore-keys: |
-          ${{ runner.os }}-ccache-${{ github.ref }}
           ${{ runner.os }}-ccache-
-      # 添加缓存命中状态提示
       id: ccache-cache
-      continue-on-error: true
 
     - name: 构建内核
+      working-directory: kernel-src
       run: |
         # 显示缓存状态
         if [[ "${{ steps.ccache-cache.outputs.cache-hit }}" == 'true' ]]; then
@@ -107,78 +142,106 @@ jobs:
           echo "ℹ️ 未找到ccache缓存，将重新构建"
         fi
         
-        echo "🛠️ 开始配置内核..."
-        make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
-          CLANG_TRIPLE=aarch64-linux-gnu- \
-          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
-          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
-          quiet=quiet_ O=out evergo_defconfig
+        # 清理构建环境
+        echo "🧹 清理构建环境..."
+        make O=out clean && make O=out mrproper
         
-        echo "⚙️ 开始编译内核..."
+        # 配置内核
+        echo "⚙️ 配置内核 (evergo_defconfig)..."
         make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
-          quiet=quiet_ O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log
+          O=out evergo_defconfig || { echo "❌ 配置失败"; exit 1; }
+        
+        # 编译内核
+        echo "🔨 编译内核 (使用 $(($(nproc) + 1)) 线程)..."
+        time make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+          O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log || { echo "❌ 编译失败"; exit 1; }
         
         # 显示缓存统计
-        echo "📊 编译完成！缓存使用情况:"
+        echo "📊 编译完成！ccache使用统计:"
         ccache -s
-        echo "✅ 内核编译完成！"
+        echo "✅ 内核编译成功！"
+        
+        # 记录编译时间
+        echo "⏱️ 编译时间统计:"
+        grep -E "real|user|sys" build.log || true
+
     - name: 验证内核镜像
+      working-directory: kernel-src
       run: |
+        echo "🔍 验证内核镜像..."
         if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
           echo "❌ 错误：未找到内核镜像文件"
+          echo "⚠️ 构建目录内容:"
+          ls -lR out/arch/arm64/boot/ || true
           exit 1
         fi
-        echo "✅ 验证通过：out/arch/arm64/boot/Image.gz-dtb"
         
-        # 显示文件大小
+        # 显示文件信息
         file_size=$(du -h out/arch/arm64/boot/Image.gz-dtb | cut -f1)
-        echo "ℹ️ 内核镜像大小: $file_size"
-    # 保存构建日志，即使构建失败
+        file_info=$(file out/arch/arm64/boot/Image.gz-dtb)
+        echo "✅ 内核镜像验证通过:"
+        echo "📁 文件路径: out/arch/arm64/boot/Image.gz-dtb"
+        echo "📏 大小: $file_size"
+        echo "ℹ️ 文件类型: $file_info"
+
     - name: 收集构建日志
       if: always()
+      working-directory: kernel-src
       run: |
         echo "📝 收集构建日志..."
         mkdir -p build_logs
         
         # 保存主构建日志
-        cp build.log build_logs/
+        [ -f build.log ] && cp build.log build_logs/ || echo "⚠️ 主构建日志缺失"
         
         # 保存配置文件
         [ -f out/.config ] && cp out/.config build_logs/kernel_config || echo "⚠️ 未找到配置文件"
         
         # 保存其他构建日志
-        find out -name "*.log" -exec cp {} build_logs/ \; 2>/dev/null || true
+        find out -name "*.log" -exec cp --parents {} build_logs/ \; 2>/dev/null || true
         
         # 创建日志压缩包
-        tar -czvf build_logs.tar.gz build_logs
-        echo "✅ 构建日志已保存：build_logs.tar.gz"
-    # 创建可刷入的ZIP包
+        tar -czvf ../build_logs.tar.gz build_logs
+        echo "✅ 构建日志已保存: build_logs.tar.gz"
+
     - name: 制作AnyKernel3刷机包
+      working-directory: kernel-src
       run: |
-        echo "📦 准备AnyKernel3刷机包..."
+        echo "📦 制作AnyKernel3刷机包..."
         
         # 克隆AnyKernel3仓库
-        git clone --depth=1 https://github.com/cuicanmx/AnyKernel3.git
+        git clone --quiet --depth=1 https://github.com/cuicanmx/AnyKernel3.git
         
         # 复制内核镜像
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-        echo "ℹ️ 内核镜像已复制到AnyKernel3目录"
+        echo "✅ 内核镜像复制完成"
+        
+        # 添加构建信息
+        echo "Kernel Version: ${{ env.KERNEL_BRANCH }} (${{ env.KERNEL_COMMIT }})" > AnyKernel3/version
+        if [ "${{ inputs.include_ksu }}" = "true" ]; then
+          echo "KernelSU Version: ${{ env.KSU_VERSION }}" >> AnyKernel3/version
+        fi
+        echo "Build Date: $(date)" >> AnyKernel3/version
         
         # 创建刷机包
         cd AnyKernel3
-        zip -r9 ../anykernel_flashable.zip * > /dev/null
+        zip -r9q ../anykernel_flashable.zip *
         cd ..
         
         # 显示刷机包信息
         zip_size=$(du -h anykernel_flashable.zip | cut -f1)
-        echo "✅ AnyKernel3刷机包创建完成：anykernel_flashable.zip ($zip_size)"
-    # 打包原始构建产物
+        echo "✅ 刷机包创建完成: anykernel_flashable.zip ($zip_size)"
+
     - name: 打包内核产物
+      working-directory: kernel-src
       run: |
         echo "📁 打包内核产物..."
         mkdir -p kernel_artifacts
@@ -190,61 +253,73 @@ jobs:
         [ -f out/.config ] && cp out/.config kernel_artifacts/kernel_config
         
         # 创建压缩包
-        tar -czvf kernel_artifacts.tar.gz kernel_artifacts
+        tar -czvf ../kernel_artifacts.tar.gz kernel_artifacts
         
         # 显示产物信息
-        artifact_size=$(du -h kernel_artifacts.tar.gz | cut -f1)
-        echo "✅ 内核产物打包完成：kernel_artifacts.tar.gz ($artifact_size)"
+        artifact_size=$(du -h ../kernel_artifacts.tar.gz | cut -f1)
+        echo "✅ 内核产物打包完成: kernel_artifacts.tar.gz ($artifact_size)"
+
     - name: 上传构建产物
       uses: actions/upload-artifact@v4
       with:
         name: kernel-${{ github.run_id }}
         path: |
-          kernel_artifacts.tar.gz
-          anykernel_flashable.zip
           build_logs.tar.gz
-        retention-days: 7  # 保留7天
-
+          anykernel_flashable.zip
+          kernel_artifacts.tar.gz
 
     - name: 生成发布标签
       id: generate_tag
       run: |
-          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
-          echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
-          echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
+        TAG_SUFFIX=$(date -u +"%Y%m%d")
+        echo "TAG_NAME=kernel-$TAG_SUFFIX-${{ env.KERNEL_COMMIT }}" >> $GITHUB_ENV
+        echo "ℹ️ 生成的发布标签: $TAG_NAME"
+
     - name: 发布版本
       if: github.ref == 'refs/heads/main' && success()
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ env.TAG_NAME }}  # 使用上面生成的标签
-        name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
+        tag_name: ${{ env.TAG_NAME }}
+        name: "内核构建 #${{ github.run_number }} (${{ env.KERNEL_BRANCH }})"
         body: |
           ### 🚀 内核构建详情
           - **构建日期**: $(date)
-          - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
           - **构建ID**: ${{ github.run_id }}
           - **发布标签**: ${{ env.TAG_NAME }}
-          - **KernelSU集成**: ${{ inputs.include_ksu && '是' || '否' }}
-          ${{ inputs.include_ksu && format('- **KernelSU仓库**: {0}', inputs.ksu_repo) || '' }}
-          ${{ inputs.include_ksu && format('- **内核分支**: {0}', inputs.kernel_branch) || '' }}
+          - **内核分支**: ${{ env.KERNEL_BRANCH }}
+          - **内核提交**: [${{ env.KERNEL_COMMIT }}](https://github.com/${{ github.repository }}/commit/${{ env.KERNEL_COMMIT }})
+          - **KernelSU支持**: ${{ inputs.include_ksu && '是' || '否' }}
+          ${{ inputs.include_ksu && format('- **KernelSU版本**: {0}', env.KSU_VERSION) || '' }}
           
-          ### 📲 安装说明
-          1. 下载 `anykernel_flashable.zip`
-          2. 重启进入恢复模式 (推荐使用TWRP)
-          3. 刷入ZIP文件
-          4. 重启系统
+          ### 📦 构建产物
+          1. `anykernel_flashable.zip` - 可直接刷入的刷机包
+          2. `kernel_artifacts.tar.gz` - 原始内核产物
+          3. `build_logs.tar.gz` - 完整构建日志
           
-          ### 📁 构建产物
-          - `kernel_artifacts.tar.gz`: 原始内核产物 (包含内核镜像和配置文件)
-          - `anykernel_flashable.zip`: 可直接刷入的刷机包
+          ### 📲 刷机指南
+          ```bash
+          adb reboot recovery
+          adb push anykernel_flashable.zip /sdcard/
+          # 在恢复模式中刷入zip文件
+          ```
           
-          ### ℹ️ 注意事项
-          - 请确保设备兼容性后再刷入
-          - 刷机前建议备份重要数据
+          ### ⚠️ 注意事项
+          - 刷机前请备份重要数据
+          - 仅适用于兼容设备
+          - 首次启动可能需要较长时间
         files: |
-          kernel_artifacts.tar.gz
-          anykernel_flashable.zip
           build_logs.tar.gz
+          anykernel_flashable.zip
+          kernel_artifacts.tar.gz
         draft: false
+        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 清理工作区
+      if: always()
+      run: |
+        echo "🧹 清理工作区..."
+        # 保留ccache目录
+        rm -rf kernel-src
+        echo "✅ 清理完成"
