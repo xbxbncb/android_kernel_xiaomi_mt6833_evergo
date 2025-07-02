@@ -1,16 +1,28 @@
 name: Auto Kernel Builer
-on: [push]
+on:
+   push:
+      branches: [main,ksu]
+   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest  # 使用标准x86 Runner
+    strategy:
+      matrix: 
+        branch: ['main', 'ksu']
+      fail-fast: false
     timeout-minutes: 45
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 20G
 
     steps:
-    - name: Checkout Code
+    - name: Checkout ${{ matrix.branch }} branch Code
       uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.branch }}
 
-    - name: Install Dependencies
+    - name: Install Dependencies & toolchain
       run: |
         sudo apt update
         sudo apt install -y \
@@ -45,16 +57,18 @@ jobs:
           zlib1g-dev \
           gcc-aarch64-linux-gnu
 
-    - name: Prepare Clang Environment
+    - name: Configure ccache
       run: |
-        # 配置LLVM符号链接
-        sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
-        sudo ln -sf /usr/bin/lld-18 /usr/bin/ld.lld
-        
-        # 配置ccache
-        sudo mkdir -p /usr/lib/ccache
-        sudo ln -sf /usr/bin/ccache /usr/lib/ccache/clang
+        mkdir -p $CCACHE_DIR
+        echo "max_size = $CCACHE_MAXSIZE"
+        sudo chmod -R 777 $CCACHE_DIR
 
+    - name: Restore ccache
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
+    
     - name: Build Kernel (ARM64 Cross-Compile)
       env:
         ARCH: arm64
@@ -89,11 +103,19 @@ jobs:
 
     - name: Package Kernel
       run: |
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-        zip -r9 AnyKernel3.zip AnyKernel3/
+        zip -r9 AnyKernel3-${{ matrix.branch }}.zip AnyKernel3/
 
     - name: Upload AnyKernel3.zip
       uses: actions/upload-artifact@v4
       with:
-        name: Kernel-Zip
-        path: AnyKernel3.zip
+        name: Kernel-${{ matrix.branch }}.zip
+        path: AnyKernel3-${{ matrix.branch }}.zip
+
+    - name: Save ccache
+      uses: actions/cache/save@v3
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
+    
