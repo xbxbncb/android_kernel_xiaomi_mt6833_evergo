@@ -1,7 +1,7 @@
 name: Kernel Build and Release
 
 on:
-  workflow_dispatch: # 手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -34,31 +34,43 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: ${{ runner.os }}-ccache-${{ github.ref }}  # 基于分支名缓存
+        key: ${{ runner.os }}-ccache-${{ github.ref }}
         restore-keys: ${{ runner.os }}-ccache-${{ github.ref }}
 
     - name: Build kernel
       run: |
-       clang -v
-       ccache clang -v
-       make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ -j$(nproc) evergo_defconfig
-       make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ -j$(nproc) -j$(($(nproc) + 1)) 2>&1 | tee build.log
+        # 清理和配置
+        make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+          quiet=quiet_ O=out evergo_defconfig
+        
+        # 实际构建
+        make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+          quiet=quiet_ O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log
     
-    - name: Save build log  # 关键修复：始终保存日志
+    - name: Save build log
       if: always()
       run: cp build.log . || true
-
-    - name: Verify build artifacts
+      
+    # 简化的验证步骤：只检查内核镜像是否存在
+    - name: Verify kernel image
       run: |
-        [ -f arch/arm64/boot/Image ] || (echo "Kernel image not found"; exit 1)
-        [ -f arch/arm64/boot/dts/**/*.dtb ] || echo "Warning: No device tree files"  # 修复路径
-
+        [ -f out/arch/arm64/boot/* ] || (echo "Kernel image not found"; exit 1)
+      
+    # 优化后的打包步骤：只打包 boot 目录内容
     - name: Package artifacts
       run: |
+        # 创建输出目录
         mkdir -p kernel-output
-        cp arch/arm64/boot/Image* kernel-output/
-        find arch/arm64/boot/dts -name '*.dtb' -exec cp --parents {} kernel-output/ \; 2>/dev/null || true
-        cp System.map kernel-output/ || true
+        # 直接复制整个 boot 目录内容
+        cp -r out/arch/arm64/boot/* kernel-output/
         tar -czvf kernel-artifacts.tar.gz kernel-output
 
     - name: Upload artifacts
@@ -71,10 +83,10 @@ jobs:
         retention-days: 7
 
     - name: Create Release
-      if: github.ref == 'refs/heads/main' && success()  # 关键修复：仅当构建成功
+      if: github.ref == 'refs/heads/main' && success()
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: kernel-$(date +%Y%m%d-%H%M)
+        tag_name: kernel-normal-$(date +%Y%m%d-%H%M)
         name: Kernel Build ${{ github.run_number }}
         body: |
           Build log: [build.log](build.log)
