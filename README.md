@@ -40,8 +40,8 @@ CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
 CCACHE_DIR="/home/c/.ccache" \
 CLANG_TRIPLE=aarch64-linux-gnu- \
 LD=ld.lld \
-KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
- -j$(nproc) O=out evergo_defconfig
+KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_  \
+-j$(nproc) -k O=out evergo_defconfig
 ```
 ```
 #配置配置(如果您有开启docker等功能的需要，若没有请不要执行)
@@ -65,7 +65,7 @@ CCACHE_DIR="/home/c/.ccache" \
 CLANG_TRIPLE=aarch64-linux-gnu- \
 LD=ld.lld \
 KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
- -j$(nproc) O=out
+ -j$(nproc) -k O=out
 
 ```
 
