@@ -149,22 +149,21 @@ jobs:
         make O=out clean && make O=out mrproper
         
         # 配置内核
-        echo "⚙️ 配置内核 (evergo_defconfig)..."
+        echo "🛠️ 开始配置内核..."
         make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
-          O=out evergo_defconfig || { echo "❌ 配置失败"; exit 1; }
+          quiet=quiet_ O=out evergo_defconfig
         
-        # 编译内核
-        echo "🔨 编译内核 (使用 $(($(nproc) + 1)) 线程)..."
-        time make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
+        echo "⚙️ 开始编译内核..."
+        make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
-          O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log || { echo "❌ 编译失败"; exit 1; }
+          quiet=quiet_ O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log
         
         # 显示缓存统计
         echo "📊 编译完成！ccache使用统计:"
