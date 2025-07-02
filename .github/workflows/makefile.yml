@@ -42,7 +42,8 @@ jobs:
           squashfs-tools \
           xsltproc \
           zip \
-          zlib1g-dev
+          zlib1g-dev \
+          gcc-aarch64-linux-gnu
 
     - name: Prepare Clang Environment
       run: |
@@ -77,6 +78,9 @@ jobs:
           CC="ccache clang" \
           LD=ld.lld \
           CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           LLVM_IAS=1 \
           KCFLAGS="--target=aarch64-linux-gnu \
                    -Wno-unused-but-set-variable \
@@ -88,7 +92,7 @@ jobs:
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         zip -r9 AnyKernel3.zip AnyKernel3/
 
-    - name: Upload Artifact
+    - name: Upload AnyKernel3.zip
       uses: actions/upload-artifact@v4
       with:
         name: Kernel-Zip
