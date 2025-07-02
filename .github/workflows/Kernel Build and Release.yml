@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: debian:bookworm  # 使用Debian稳定版
-
+    
     steps:
     - name: 检出代码库
       uses: actions/checkout@v4
@@ -21,8 +21,8 @@ jobs:
         bc bison build-essential ccache clang cpio curl flex git \
         gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
         libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
-        rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
-        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make && apt clean
+        schedtool squashfs-tools xsltproc zip zlib1g-dev \
+        lld make && apt clean
 
     - name: 配置ccache缓存
       run: |
