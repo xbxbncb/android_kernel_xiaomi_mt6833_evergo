@@ -63,6 +63,9 @@ jobs:
           CC="ccache clang" \
           LD=ld.lld \
           CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           LLVM_IAS=1 \
           KCFLAGS="--target=aarch64-linux-gnu \
                    -Wno-unused-but-set-variable \
