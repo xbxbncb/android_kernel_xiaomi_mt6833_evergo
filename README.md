@@ -45,9 +45,9 @@ ccache -M 20G
 ```
 #使用默认配置
 make ARCH=arm64 \
+CC="ccache clang" \
 CROSS_COMPILE=aarch64-linux-gnu- \
 CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-CC="ccache clang" \
 CCACHE_DIR="/home/c/.ccache" \
 CLANG_TRIPLE=aarch64-linux-gnu- \
 LD=ld.lld \
@@ -69,9 +69,9 @@ KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" 
 ```
 #开始编译
 make ARCH=arm64 \
+CC="ccache clang" \
 CROSS_COMPILE=aarch64-linux-gnu- \
 CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-CC="ccache clang" \
 CCACHE_DIR="/home/c/.ccache" \
 CLANG_TRIPLE=aarch64-linux-gnu- \
 LD=ld.lld \
