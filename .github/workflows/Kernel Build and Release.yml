@@ -8,6 +8,16 @@ on:
         required: true
         type: boolean
         default: false
+      kernel_branch:
+        description: "内核分支（用于KernelSU）"
+        required: false
+        type: string
+        default: "ksu"
+      ksu_repo:
+        description: "KernelSU仓库地址（可选）"
+        required: false
+        type: string
+        default: "https://github.com/tiann/KernelSU"
 
 jobs:
   build:
@@ -20,6 +30,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0  # 获取完整提交历史
+        ref: ${{ inputs.kernel_branch != '' && inputs.kernel_branch || 'main' }}  # 使用指定的分支或默认main
 
     - name: 安装构建依赖
       run: |
@@ -35,8 +46,29 @@ jobs:
       if: ${{ inputs.include_ksu == true }}
       run: |
         echo "ℹ️ 正在集成KernelSU..."
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
-        echo "✅ KernelSU集成完成！"
+        echo "ℹ️ 内核分支: ${{ inputs.kernel_branch }}"
+        echo "ℹ️ KernelSU仓库: ${{ inputs.ksu_repo }}"
+        
+        # 移除可能已存在的KernelSU目录
+        if [ -d "KernelSU" ]; then
+          rm -rf KernelSU
+          echo "已移除旧的KernelSU目录"
+        fi
+        
+        # 克隆KernelSU仓库
+        git clone ${{ inputs.ksu_repo }} KernelSU
+        
+        # 检查是否克隆成功
+        if [ $? -ne 0 ]; then
+          echo "❌ 克隆KernelSU仓库失败"
+          exit 1
+        fi
+        
+        # 显示克隆的KernelSU版本
+        cd KernelSU
+        KSU_VERSION=$(git describe --tags 2>/dev/null || git rev-parse --short HEAD)
+        cd ..
+        echo "✅ KernelSU集成完成！版本: $KSU_VERSION"
         
     - name: 配置ccache缓存
       run: |
@@ -137,11 +169,6 @@ jobs:
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         echo "ℹ️ 内核镜像已复制到AnyKernel3目录"
         
-        # # 添加构建信息
-        # echo "Kernel Version: $(date +%Y-%m-%d)" > AnyKernel3/version
-        # echo "Build ID: $GITHUB_RUN_ID" >> AnyKernel3/version
-        # echo "Commit SHA: $GITHUB_SHA" >> AnyKernel3/version
-        
         # 创建刷机包
         cd AnyKernel3
         zip -r9 ../anykernel_flashable.zip * > /dev/null
@@ -197,6 +224,9 @@ jobs:
           - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
           - **构建ID**: ${{ github.run_id }}
           - **发布标签**: ${{ env.TAG_NAME }}
+          - **KernelSU集成**: ${{ inputs.include_ksu && '是' || '否' }}
+          ${{ inputs.include_ksu && format('- **KernelSU仓库**: {0}', inputs.ksu_repo) || '' }}
+          ${{ inputs.include_ksu && format('- **内核分支**: {0}', inputs.kernel_branch) || '' }}
           
           ### 📲 安装说明
           1. 下载 `anykernel_flashable.zip`
@@ -218,4 +248,3 @@ jobs:
         draft: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
