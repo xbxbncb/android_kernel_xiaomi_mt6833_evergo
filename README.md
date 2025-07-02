@@ -1,7 +1,7 @@
 # 使用教程
 ## 1. 自行 git 本项目编译
 ### 1. 安装编译所需工具链
-推荐使用 debian 12 或 ubuntu 18.0.2 进行编译
+推荐使用 debian 12 或 ubuntu 18.04 进行编译
 ```
 sudo apt update && sudo apt install -y build-essential clang lld \
 libssl-dev libelf-dev flex bison bc ccache curl git git-lfs gnupg \
