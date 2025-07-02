@@ -39,16 +39,12 @@ jobs:
         ARCH: arm64
         SUBARCH: arm
       run: |
-        # 纯Clang交叉编译命令
         make -j32 O=out \
           CC="ccache clang" \
           LD=ld.lld \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           LLVM_IAS=1 \
           KCFLAGS="--target=aarch64-linux-gnu \
-                   -Wno-unused-but-set-variable \
-                   -Wno-implicit-function-declaration \
-                   KCFLAGS="--target=aarch64-linux-gnu \
                    -Wno-unused-but-set-variable \
                    -Wno-implicit-function-declaration \
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label -fno-PIE" \
