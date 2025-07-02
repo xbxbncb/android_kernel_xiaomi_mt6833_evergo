@@ -47,19 +47,7 @@ jobs:
         ref: ${{ inputs.kernel_branch || 'main' }}
         # 显示检出信息
         path: kernel-src
-      
-    - name: 记录内核版本信息
-      id: kernel_info
-      working-directory: kernel-src
-      run: |
-        KERNEL_COMMIT=$(git rev-parse --short HEAD)
-        KERNEL_BRANCH=$(git branch --show-current)
-        echo "ℹ️ 内核信息: 分支 $KERNEL_BRANCH, 提交 $KERNEL_COMMIT"
-        echo "KERNEL_COMMIT=$KERNEL_COMMIT" >> $GITHUB_ENV
-        echo "KERNEL_BRANCH=$KERNEL_BRANCH" >> $GITHUB_ENV
-        echo "::set-output name=commit::$KERNEL_COMMIT"
-        echo "::set-output name=branch::$KERNEL_BRANCH"
-
+        
     - name: 安装构建依赖
       run: |
         echo "🔧 安装构建依赖..."
@@ -73,6 +61,20 @@ jobs:
         apt-get clean
         rm -rf /var/lib/apt/lists/*
         echo "✅ 依赖安装完成"
+        
+    - name: 记录内核版本信息
+      id: kernel_info
+      working-directory: kernel-src
+      run: |
+        KERNEL_COMMIT=$(git rev-parse --short HEAD)
+        KERNEL_BRANCH=$(git branch --show-current)
+        echo "ℹ️ 内核信息: 分支 $KERNEL_BRANCH, 提交 $KERNEL_COMMIT"
+        echo "KERNEL_COMMIT=$KERNEL_COMMIT" >> $GITHUB_ENV
+        echo "KERNEL_BRANCH=$KERNEL_BRANCH" >> $GITHUB_ENV
+        echo "::set-output name=commit::$KERNEL_COMMIT"
+        echo "::set-output name=branch::$KERNEL_BRANCH"
+
+
 
     # 添加KernelSU集成步骤
     - name: 集成KernelSU
