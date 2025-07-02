@@ -1,33 +1,25 @@
 name: Kernel Build and Release
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 手动触发
     inputs:
-      branch:
-        description: '选择要构建的分支'
+      include_ksu:
+        description: "是否集成KernelSU"
         required: true
-        type: choice
-        options:
-          - main
-          - ksu
-        default: main
+        type: boolean
+        default: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: debian:bookworm
-
-    # 修复1：添加环境变量定义分支名
-    env:
-      BUILD_BRANCH: ${{ github.event.inputs.branch }}
+      image: debian:bookworm  # 使用Debian稳定版
 
     steps:
-    - name: 准备内核源码
+    - name: 检出代码库
       uses: actions/checkout@v4
       with:
-        ref: ${{ env.BUILD_BRANCH }}
-        fetch-depth: 0
+        fetch-depth: 0  # 获取完整提交历史
 
     - name: 安装构建依赖
       run: |
@@ -36,40 +28,54 @@ jobs:
         gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
         libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
         rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
-        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make bash && apt clean  # 添加bash安装
-
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make && apt clean
+        
+    # 添加KernelSU集成步骤
+    - name: 集成KernelSU
+      if: ${{ inputs.include_ksu == true }}
+      run: |
+        echo "ℹ️ 正在集成KernelSU..."
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+        echo "✅ KernelSU集成完成！"
+        
     - name: 配置ccache缓存
       run: |
+        # 首先创建缓存目录
         CCACHE_DIR="$GITHUB_WORKSPACE/.ccache"
         mkdir -p "$CCACHE_DIR"
+    
+        # 然后设置环境变量
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+    
+        # 配置ccache
         ccache -M 20G
         ccache -o compression=true
+        echo "ℹ️ ccache缓存已配置，目录: $CCACHE_DIR"
 
-    # 修复2：使用正确的缓存键
+    # 优化的缓存策略：使用分支名作为键，提高缓存命中率
     - name: 缓存ccache数据
       uses: actions/cache@v4
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: ${{ runner.os }}-ccache-${{ env.BUILD_BRANCH }}-${{ hashFiles('Makefile') }}  # 使用实际分支名
+        key: ${{ runner.os }}-ccache-${{ github.ref }}  # 基于分支名缓存
         restore-keys: |
-          ${{ runner.os }}-ccache-${{ env.BUILD_BRANCH }}
+          ${{ runner.os }}-ccache-${{ github.ref }}
           ${{ runner.os }}-ccache-
+      # 添加缓存命中状态提示
       id: ccache-cache
       continue-on-error: true
 
-    # 修复3：使用bash并修复条件判断
     - name: 构建内核
-      shell: bash  # 指定使用bash
       run: |
-        # 修复4：使用标准测试语法
-        if [ "${{ steps.ccache-cache.outputs.cache-hit }}" = "true" ]; then
+        # 显示缓存状态
+        if [[ "${{ steps.ccache-cache.outputs.cache-hit }}" == 'true' ]]; then
           echo "♻️ ccache缓存命中！缓存状态:"
           ccache -s
         else
           echo "ℹ️ 未找到ccache缓存，将重新构建"
         fi
         
+        echo "🛠️ 开始配置内核..."
         make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
@@ -77,6 +83,7 @@ jobs:
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           quiet=quiet_ O=out evergo_defconfig
         
+        echo "⚙️ 开始编译内核..."
         make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
@@ -84,8 +91,10 @@ jobs:
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           quiet=quiet_ O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log
         
+        # 显示缓存统计
+        echo "📊 编译完成！缓存使用情况:"
         ccache -s
-        
+        echo "✅ 内核编译完成！"
     - name: 验证内核镜像
       run: |
         if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
@@ -97,7 +106,6 @@ jobs:
         # 显示文件大小
         file_size=$(du -h out/arch/arm64/boot/Image.gz-dtb | cut -f1)
         echo "ℹ️ 内核镜像大小: $file_size"
-
     # 保存构建日志，即使构建失败
     - name: 收集构建日志
       if: always()
@@ -117,7 +125,6 @@ jobs:
         # 创建日志压缩包
         tar -czvf build_logs.tar.gz build_logs
         echo "✅ 构建日志已保存：build_logs.tar.gz"
-
     # 创建可刷入的ZIP包
     - name: 制作AnyKernel3刷机包
       run: |
@@ -130,6 +137,11 @@ jobs:
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         echo "ℹ️ 内核镜像已复制到AnyKernel3目录"
         
+        # # 添加构建信息
+        # echo "Kernel Version: $(date +%Y-%m-%d)" > AnyKernel3/version
+        # echo "Build ID: $GITHUB_RUN_ID" >> AnyKernel3/version
+        # echo "Commit SHA: $GITHUB_SHA" >> AnyKernel3/version
+        
         # 创建刷机包
         cd AnyKernel3
         zip -r9 ../anykernel_flashable.zip * > /dev/null
@@ -138,7 +150,6 @@ jobs:
         # 显示刷机包信息
         zip_size=$(du -h anykernel_flashable.zip | cut -f1)
         echo "✅ AnyKernel3刷机包创建完成：anykernel_flashable.zip ($zip_size)"
-
     # 打包原始构建产物
     - name: 打包内核产物
       run: |
@@ -157,7 +168,6 @@ jobs:
         # 显示产物信息
         artifact_size=$(du -h kernel_artifacts.tar.gz | cut -f1)
         echo "✅ 内核产物打包完成：kernel_artifacts.tar.gz ($artifact_size)"
-
     - name: 上传构建产物
       uses: actions/upload-artifact@v4
       with:
@@ -166,30 +176,24 @@ jobs:
           kernel_artifacts.tar.gz
           anykernel_flashable.zip
           build_logs.tar.gz
-        retention-days: 7
+        retention-days: 7  # 保留7天
 
-    - name: 设置构建时间和标签
+
+    - name: 生成发布标签
+      id: generate_tag
       run: |
-        BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
-        echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
-        # 修复2：标签中包含分支名
-        echo "TAG_NAME=${{ github.event.inputs.branch }}-kernel-$TAG_SUFFIX" >> $GITHUB_ENV
-        echo "ℹ️ 生成的发布标签: $TAG_NAME"
-
+          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
+          echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
+          echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
     - name: 发布版本
-      # 修复3：所有分支都发布，但内容不同
-      if: success()
+      if: github.ref == 'refs/heads/main' && success()
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ env.TAG_NAME }}
-        # 修复4：发布名称包含分支名
-        name: "${{ github.event.inputs.branch }} 内核构建 #${{ github.run_number }}"
-        # 修复5：分支特定的发布内容
+        tag_name: ${{ env.TAG_NAME }}  # 使用上面生成的标签
+        name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
         body: |
           ### 🚀 内核构建详情
-          - **构建分支**: ${{ github.event.inputs.branch }}
-          - **构建日期**: ${{ env.BUILD_DATE }}
+          - **构建日期**: $(date)
           - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
           - **构建ID**: ${{ github.run_id }}
           - **发布标签**: ${{ env.TAG_NAME }}
@@ -205,8 +209,6 @@ jobs:
           - `anykernel_flashable.zip`: 可直接刷入的刷机包
           
           ### ℹ️ 注意事项
-          - **${{ github.event.inputs.branch }} 分支特性**:
-            ${{ github.event.inputs.branch == 'main' && '• 稳定版本\n• 经过完整测试' || '• 实验性功能\n• 包含最新特性' }}
           - 请确保设备兼容性后再刷入
           - 刷机前建议备份重要数据
         files: |
@@ -216,3 +218,4 @@ jobs:
         draft: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
