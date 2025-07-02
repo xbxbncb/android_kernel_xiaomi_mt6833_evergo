@@ -15,6 +15,8 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 20G
+      ARCH: arm64
+      SUBARCH: arm
 
     steps:
     - name: Checkout ${{ matrix.branch }} branch Code
@@ -70,9 +72,6 @@ jobs:
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
     
     - name: Build Kernel (ARM64 Cross-Compile)
-      env:
-        ARCH: arm64
-        SUBARCH: arm
       run: |
         make -j32 O=out \
           CC="ccache clang" \
@@ -85,7 +84,7 @@ jobs:
           KCFLAGS="--target=aarch64-linux-gnu \
                    -Wno-unused-but-set-variable \
                    -Wno-implicit-function-declaration \
-                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label -fno-PIE" \
+                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           evergo_defconfig
 
         make -j32 O=out \
@@ -99,7 +98,7 @@ jobs:
           KCFLAGS="--target=aarch64-linux-gnu \
                    -Wno-unused-but-set-variable \
                    -Wno-implicit-function-declaration \
-                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label -fno-PIE"
+                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label"
 
     - name: Package Kernel
       run: |
@@ -117,5 +116,5 @@ jobs:
       uses: actions/cache/save@v3
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
+        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ github.run_id }}
     
