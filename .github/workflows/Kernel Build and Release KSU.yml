@@ -1,4 +1,4 @@
-name: Kernel Build and Release (KSU)
+name: Kernel Build and Release
 
 on:
   workflow_dispatch:  # 手动触发
@@ -82,9 +82,8 @@ jobs:
         ccache -s
         echo "✅ 内核编译完成！"
 
-    - name: 验证内核镜像
+    - name: 验证内核镜像和准备准备AnyKernel3刷机包
       run: |
-      
         if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
           echo "❌ 错误：未找到内核镜像文件"
           exit 1
