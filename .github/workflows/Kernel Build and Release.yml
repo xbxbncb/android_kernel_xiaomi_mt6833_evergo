@@ -16,10 +16,9 @@ jobs:
     - name: 生成发布标签
       id: generate_tag
       run: |
-        # 使用Unix时间戳作为标签后缀（纯数字，无无效字符）
-        TAG_SUFFIX=$(date +%s)
-        echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
-        echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
+          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
+          echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
+          echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
 
     - name: 发布版本
       if: github.ref == 'refs/heads/main' && success()
