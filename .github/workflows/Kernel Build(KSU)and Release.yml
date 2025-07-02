@@ -1,5 +1,5 @@
 
-name: Kernel Build and Release
+name: Kernel Build and Release KSU
 
 on:
   workflow_dispatch:  # 手动触发
