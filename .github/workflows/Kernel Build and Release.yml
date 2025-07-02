@@ -41,11 +41,9 @@ jobs:
       run: |
        clang -v
        ccache clang -v
-       
-       make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- LD=ld.lld KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ -j$(($(nproc) + 1)) evergo_defconfig
-
-       make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu- LD=ld.lld KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ -j$(($(nproc) + 1)) 2>&1 | tee build.log
-
+       make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ -j$(nproc) O=out evergo_defconfig
+       make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ -j$(nproc) O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log
+    
     - name: Save build log  # 关键修复：始终保存日志
       if: always()
       run: cp build.log . || true
