@@ -1,4 +1,4 @@
-name: ARM64 Kernel CI (Pure Clang Cross-Compile)
+name: Auto Kernel Builer
 on: [push]
 
 jobs:
@@ -22,7 +22,27 @@ jobs:
           flex \
           bison \
           bc \
-          ccache
+          ccache \
+          curl \
+          git \
+          git-lfs \
+          gnupg \
+          gperf \
+          imagemagick \
+          liblz4-tool \
+          libncurses6 \
+          libncurses5-dev \
+          libsdl1.2-dev \
+          libxml2 \
+          libxml2-utils \
+          lzop \
+          pngcrush \
+          rsync \
+          schedtool \
+          squashfs-tools \
+          xsltproc \
+          zip \
+          zlib1g-dev
 
     - name: Prepare Clang Environment
       run: |
