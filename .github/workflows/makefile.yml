@@ -9,7 +9,7 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest-arm
+    runs-on: ubuntu-24.0.4-arm
 
     steps:
     - uses: actions/checkout@v4
