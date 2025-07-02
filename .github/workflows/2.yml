@@ -1,0 +1,177 @@
+name: Kernel Build and Release test1
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
+
+    steps:
+    - name: 检出代码库
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 安装构建依赖（带缓存）
+      id: deps-cache
+      run: |
+        # 检查依赖是否已安装
+        if [ -f /tmp/deps_installed ]; then
+          echo "✅ 依赖已安装"
+          exit 0
+        fi
+        
+        # 安装依赖并标记完成
+        apt update && apt install -y \
+        bc bison build-essential ccache clang cpio curl flex git \
+        gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
+        libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
+        rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make && apt clean
+        
+        touch /tmp/deps_installed
+      env:
+        CACHE_KEY: ${{ runner.os }}-deps-${{ github.ref }}
+
+    - name: 配置ccache缓存
+      run: |
+        CCACHE_DIR="$GITHUB_WORKSPACE/.ccache"
+        mkdir -p "$CCACHE_DIR"
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+        
+        ccache -M 20G
+        ccache -o compression=true
+        echo "ℹ️ ccache缓存已配置，目录: $CCACHE_DIR"
+
+    - name: 恢复ccache缓存
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ${{ runner.os }}-ccache-${{ github.ref }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-${{ github.ref }}
+          ${{ runner.os }}-ccache-
+      id: ccache-cache
+
+    - name: 内核配置与编译
+      run: |
+        echo "🛠️ 开始配置内核..."
+        make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+          quiet=quiet_ O=out evergo_defconfig
+        
+        echo "⚙️ 开始编译内核..."
+        make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+          KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+          quiet=quiet_ O=out -j$(($(nproc) + 2)) 2>&1 | tee build.log
+        
+        echo "📊 编译完成！缓存使用情况:"
+        ccache -s
+        echo "✅ 内核编译完成！"
+
+    - name: 验证构建产物
+      run: |
+        if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
+          echo "❌ 错误：未找到内核镜像文件"
+          exit 1
+        fi
+        
+        # 验证AnyKernel3模板完整性
+        if [ ! -f AnyKernel3/anykernel.sh ]; then
+          echo "❌ 错误：AnyKernel3模板不完整"
+          exit 1
+        fi
+
+    - name: 制作刷机包
+      run: |
+        echo "📦 创建AnyKernel3刷机包..."
+        
+        # 清理旧文件
+        rm -rf AnyKernel3
+        git clone --depth=1 https://github.com/cuicanmx/AnyKernel3.git 
+        
+        # 复制内核镜像
+        cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+        
+        # 添加构建信息
+        cat > AnyKernel3/version << EOF
+        Kernel Build: $(date +%Y-%m-%d)
+        GitHub Run: $GITHUB_RUN_ID
+        Commit SHA: $GITHUB_SHA
+        Build URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+        EOF
+        
+        # 打包刷机包
+        cd AnyKernel3 && zip -r9 ../anykernel_flashable.zip * > /dev/null
+        
+        echo "✅ 刷机包创建完成"
+
+    - name: 收集构建日志
+      if: always()
+      run: |
+        mkdir -p build_logs
+        cp build.log build_logs/
+        [ -f out/.config ] && cp out/.config build_logs/kernel_config
+        
+        # 收集编译警告信息
+        grep -i "warning" build.log > build_logs/warnings.txt 2>/dev/null || true
+        
+        tar -czvf build_logs.tar.gz build_logs
+        echo "✅ 日志已归档"
+
+    - name: 生成发布元数据
+      id: release-info
+      run: |
+        # 生成唯一标签
+        TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
+        echo "TAG_NAME=release-$TAG_SUFFIX" >> $GITHUB_ENV
+        
+        # 提取内核版本信息
+        KERNEL_VERSION=$(make -s O=out kernelrelease)
+        echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
+        
+        echo "ℹ️ 发布标签: $TAG_NAME"
+        echo "ℹ️ 内核版本: $KERNEL_VERSION"
+
+    - name: 上传构建产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-${{ github.run_id }}
+        path: |
+          kernel_artifacts.tar.gz
+          anykernel_flashable.zip
+          build_logs.tar.gz
+        retention-days: 14
+
+    - name: 创建GitHub发布
+      if: github.ref == 'refs/heads/main' && success()
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.TAG_NAME }}
+        name: "内核版本 v${{ env.KERNEL_VERSION }} (${{ env.TAG_NAME }})"
+        body: |
+          ### 🚀 构建详情
+          - **内核版本**: ${{ env.KERNEL_VERSION }}
+          - **构建时间**: $(date -u +"%Y-%m-%d %H:%M UTC")
+          - **GitHub Action**: [构建日志]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
+          
+          ### 📦 下载文件
+          - `anykernel_flashable.zip`: 可刷入的ROM包
+          - `kernel_artifacts.tar.gz`: 原始内核镜像及配置
+          - `build_logs.tar.gz`: 完整构建日志及警告信息
+        files: |
+          anykernel_flashable.zip
+          kernel_artifacts.tar.gz
+          build_logs.tar.gz
+        draft: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,4 @@
-
-name: Kernel Build and Release KSU
+name: Kernel Build and Release (KSU)
 
 on:
   workflow_dispatch:  # 手动触发
@@ -11,6 +10,11 @@ jobs:
       image: debian:bookworm  # 使用Debian稳定版
 
     steps:
+    - name: 检出代码库
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整提交历史
+
     - name: 安装构建依赖
       run: |
         apt update && apt install -y \
@@ -46,11 +50,6 @@ jobs:
       # 添加缓存命中状态提示
       id: ccache-cache
       continue-on-error: true
-    - name: 构建内核
-      run: |
-        git clone https://github.com/xbxbncb/android_kernel_xiaomi_mt6833_evergo.git -b ksu
-        pwd
-        cd android_kernel_xiaomi_mt6833_evergo
 
     - name: 构建内核
       run: |
@@ -82,6 +81,7 @@ jobs:
         echo "📊 编译完成！缓存使用情况:"
         ccache -s
         echo "✅ 内核编译完成！"
+
     - name: 验证内核镜像
       run: |
         if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
@@ -93,6 +93,7 @@ jobs:
         # 显示文件大小
         file_size=$(du -h out/arch/arm64/boot/Image.gz-dtb | cut -f1)
         echo "ℹ️ 内核镜像大小: $file_size"
+
     # 保存构建日志，即使构建失败
     - name: 收集构建日志
       if: always()
@@ -112,6 +113,7 @@ jobs:
         # 创建日志压缩包
         tar -czvf build_logs.tar.gz build_logs
         echo "✅ 构建日志已保存：build_logs.tar.gz"
+
     # 创建可刷入的ZIP包
     - name: 制作AnyKernel3刷机包
       run: |
@@ -124,6 +126,11 @@ jobs:
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         echo "ℹ️ 内核镜像已复制到AnyKernel3目录"
         
+        # # 添加构建信息
+        # echo "Kernel Version: $(date +%Y-%m-%d)" > AnyKernel3/version
+        # echo "Build ID: $GITHUB_RUN_ID" >> AnyKernel3/version
+        # echo "Commit SHA: $GITHUB_SHA" >> AnyKernel3/version
+        
         # 创建刷机包
         cd AnyKernel3
         zip -r9 ../anykernel_flashable.zip * > /dev/null
@@ -132,6 +139,7 @@ jobs:
         # 显示刷机包信息
         zip_size=$(du -h anykernel_flashable.zip | cut -f1)
         echo "✅ AnyKernel3刷机包创建完成：anykernel_flashable.zip ($zip_size)"
+
     # 打包原始构建产物
     - name: 打包内核产物
       run: |
@@ -150,6 +158,7 @@ jobs:
         # 显示产物信息
         artifact_size=$(du -h kernel_artifacts.tar.gz | cut -f1)
         echo "✅ 内核产物打包完成：kernel_artifacts.tar.gz ($artifact_size)"
+
     - name: 上传构建产物
       uses: actions/upload-artifact@v4
       with:
@@ -167,6 +176,7 @@ jobs:
           TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
           echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
           echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
+
     - name: 发布版本
       if: github.ref == 'refs/heads/main' && success()
       uses: softprops/action-gh-release@v2
@@ -175,6 +185,7 @@ jobs:
         name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
         body: |
           ### 🚀 内核构建详情
+          - **构建日期**: $(date)
           - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
           - **构建ID**: ${{ github.run_id }}
           - **发布标签**: ${{ env.TAG_NAME }}
