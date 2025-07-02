@@ -185,7 +185,6 @@ jobs:
         name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
         body: |
           ### 🚀 内核构建详情
-          - **构建日期**: $(date)
           - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
           - **构建ID**: ${{ github.run_id }}
           - **发布标签**: ${{ env.TAG_NAME }}
