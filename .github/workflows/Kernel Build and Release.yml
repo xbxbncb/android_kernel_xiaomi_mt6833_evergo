@@ -1,7 +1,7 @@
 name: Kernel Build and Release
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
     inputs:
       branch:
         description: '选择要构建的分支'
@@ -16,13 +16,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: debian:bookworm  # 使用Debian稳定版
+      image: debian:bookworm
+
+    # 修复1：添加环境变量定义分支名
+    env:
+      BUILD_BRANCH: ${{ github.event.inputs.branch }}
 
     steps:
     - name: 准备内核源码
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.inputs.branch }}  # 使用输入的分支
+        ref: ${{ env.BUILD_BRANCH }}
         fetch-depth: 0
 
     - name: 安装构建依赖
@@ -32,47 +36,40 @@ jobs:
         gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
         libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
         rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
-        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make && apt clean
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make bash && apt clean  # 添加bash安装
 
     - name: 配置ccache缓存
       run: |
-        # 首先创建缓存目录
         CCACHE_DIR="$GITHUB_WORKSPACE/.ccache"
         mkdir -p "$CCACHE_DIR"
-    
-        # 然后设置环境变量
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
-    
-        # 配置ccache
         ccache -M 20G
         ccache -o compression=true
-        echo "ℹ️ ccache缓存已配置，目录: $CCACHE_DIR"
 
-    # 优化的缓存策略：使用分支名作为键，提高缓存命中率
+    # 修复2：使用正确的缓存键
     - name: 缓存ccache数据
       uses: actions/cache@v4
       with:
         path: ${{ env.CCACHE_DIR }}
-        # 修复1：使用实际选择的分支名而不是github.ref
-        key: ${{ runner.os }}-ccache-${{ github.event.inputs.branch }}-${{ hashFiles('**/Makefile') }}
+        key: ${{ runner.os }}-ccache-${{ env.BUILD_BRANCH }}-${{ hashFiles('Makefile') }}  # 使用实际分支名
         restore-keys: |
-          ${{ runner.os }}-ccache-${{ github.event.inputs.branch }}
+          ${{ runner.os }}-ccache-${{ env.BUILD_BRANCH }}
           ${{ runner.os }}-ccache-
-      # 添加缓存命中状态提示
       id: ccache-cache
       continue-on-error: true
 
+    # 修复3：使用bash并修复条件判断
     - name: 构建内核
+      shell: bash  # 指定使用bash
       run: |
-        # 显示缓存状态
-        if [[ "${{ steps.ccache-cache.outputs.cache-hit }}" == 'true' ]]; then
+        # 修复4：使用标准测试语法
+        if [ "${{ steps.ccache-cache.outputs.cache-hit }}" = "true" ]; then
           echo "♻️ ccache缓存命中！缓存状态:"
           ccache -s
         else
           echo "ℹ️ 未找到ccache缓存，将重新构建"
         fi
         
-        echo "🛠️ 开始配置内核..."
         make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
@@ -80,7 +77,6 @@ jobs:
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           quiet=quiet_ O=out evergo_defconfig
         
-        echo "⚙️ 开始编译内核..."
         make ARCH=arm64 CC="ccache clang" CROSS_COMPILE=aarch64-linux-gnu- \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
@@ -88,11 +84,8 @@ jobs:
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           quiet=quiet_ O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log
         
-        # 显示缓存统计
-        echo "📊 编译完成！缓存使用情况:"
         ccache -s
-        echo "✅ 内核编译完成！"
-
+        
     - name: 验证内核镜像
       run: |
         if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
