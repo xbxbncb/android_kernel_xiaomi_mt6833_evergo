@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: debian:bookworm
-      
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
       run: |
         apt update && apt install -y \
         bc bison build-essential ccache clang cpio curl flex git \
-        gnupg gperf imagemagick  libelf-dev liblz4-tool libncurses5-dev \
+        gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
         libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
         rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld make && apt clean
@@ -27,15 +27,19 @@ jobs:
     - name: Setup ccache
       run: |
         echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> $GITHUB_ENV
+        mkdir -p $CCACHE_DIR
         ccache -M 20G
         ccache -o compression=true
 
+    # 优化的缓存策略：使用分支名作为键，提高缓存命中率
     - name: Cache ccache
       uses: actions/cache@v4
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ${{ runner.os }}-ccache-${{ github.ref }}
-        restore-keys: ${{ runner.os }}-ccache-${{ github.ref }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-${{ github.ref }}
+          ${{ runner.os }}-ccache-
 
     - name: Build kernel
       run: |
@@ -54,24 +58,67 @@ jobs:
           CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           quiet=quiet_ O=out -j$(($(nproc) + 1)) 2>&1 | tee build.log
-    
-    - name: Save build log
-      if: always()
-      run: cp build.log . || true
-      
-    # 简化的验证步骤：只检查内核镜像是否存在
+
     - name: Verify kernel image
       run: |
-        [ -f out/arch/arm64/boot/* ] || (echo "Kernel image not found"; exit 1)
-      
-    # 优化后的打包步骤：只打包 boot 目录内容
-    - name: Package artifacts
+        if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
+          echo "❌ Kernel image not found"
+          exit 1
+        fi
+        echo "✅ Kernel image verified: out/arch/arm64/boot/Image.gz-dtb"
+
+    # 优化的日志保存：仅收集必要日志
+    - name: Save build logs
+      if: always()
       run: |
-        # 创建输出目录
-        mkdir -p kernel-output
-        # 直接复制整个 boot 目录内容
-        cp -r out/arch/arm64/boot/* kernel-output/
-        tar -czvf kernel-artifacts.tar.gz kernel-output
+        mkdir -p logs
+        # 保存主构建日志
+        cp build.log logs/
+        
+        # 保存配置（如果存在）
+        [ -f out/.config ] && cp out/.config logs/config || echo "Config not found"
+        
+        # 保存其他构建日志（如果有）
+        find out -name "*.log" -exec cp {} logs/ \; 2>/dev/null || true
+        
+        # 创建日志压缩包
+        tar -czvf build-logs.tar.gz logs
+
+    # 优化的 AnyKernel3 打包流程
+    - name: Create AnyKernel3 flashable zip
+      run: |
+        # 克隆 AnyKernel3 仓库
+        git clone --depth=1 https://github.com/cuicanmx/AnyKernel3.git
+        
+        # 复制内核镜像到 AnyKernel3
+        cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+        
+        # 添加版本信息
+        echo "Kernel Version: $(date +%Y%m%d)" > AnyKernel3/version
+        echo "Build SHA: $GITHUB_SHA" >> AnyKernel3/version
+        
+        # 创建刷机包
+        cd AnyKernel3
+        zip -r9 ../kernel-flashable.zip *
+        cd ..
+        
+        echo "✅ Created flashable ZIP: kernel-flashable.zip"
+
+    # 仅保留必要的构建产物
+    - name: Package kernel artifacts
+      run: |
+        # 创建简洁的产物目录
+        mkdir -p kernel-artifacts
+        
+        # 包含内核镜像
+        cp out/arch/arm64/boot/Image.gz-dtb kernel-artifacts/
+        
+        # 包含配置和System.map（如果存在）
+        [ -f out/.config ] && cp out/.config kernel-artifacts/
+        [ -f out/System.map ] && cp out/System.map kernel-artifacts/
+        
+        # 创建压缩包
+        tar -czvf kernel-artifacts.tar.gz kernel-artifacts
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -79,21 +126,35 @@ jobs:
         name: kernel-${{ github.run_id }}
         path: |
           kernel-artifacts.tar.gz
-          build.log
+          kernel-flashable.zip
+          build-logs.tar.gz
         retention-days: 7
 
     - name: Create Release
       if: github.ref == 'refs/heads/main' && success()
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: kernel-normal-$(date +%Y%m%d-%H%M)
+        tag_name: kernel-$(date +%Y%m%d-%H%M)
         name: Kernel Build ${{ github.run_number }}
         body: |
-          Build log: [build.log](build.log)
-          SHA: ${{ github.sha }}
+          ### Kernel Build Details
+          - **Build Date**: $(date)
+          - **Commit SHA**: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+          - **Build Log**: [build-logs.tar.gz](build-logs.tar.gz)
+          
+          ### Installation Instructions
+          1. Download `kernel-flashable.zip`
+          2. Reboot to recovery (TWRP recommended)
+          3. Flash the ZIP file
+          4. Reboot system
+          
+          ### Build Artifacts
+          - `kernel-artifacts.tar.gz`: Raw kernel artifacts (Image.gz-dtb, config, etc.)
+          - `kernel-flashable.zip`: Flashable ZIP for recovery
         files: |
           kernel-artifacts.tar.gz
-          build.log
+          kernel-flashable.zip
+          build-logs.tar.gz
         draft: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
