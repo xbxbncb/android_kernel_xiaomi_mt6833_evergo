@@ -34,19 +34,15 @@ ccache -M 20G
 #使用默认配置
 make ARCH=arm64 \
 CC="ccache clang" \
-CROSS_COMPILE=aarch64-linux-gnu- \
-LD=ld.lld \
-KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
--j$(($(nproc) + 1)) evergo_defconfig
+CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ \
+-j$(nproc) O=out evergo_defconfig
 ```
 #开始编译
 ```
 make ARCH=arm64 \
 CC="ccache clang" \
-CROSS_COMPILE=aarch64-linux-gnu- \
-LD=ld.lld \
-KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
--j$(($(nproc) + 1))
+CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=aarch64-libux-gnueabi- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" quiet=quiet_ \
+-j$(nproc) O=out
 ```
 
 6.编译完成
