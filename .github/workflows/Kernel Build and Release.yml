@@ -26,10 +26,16 @@ jobs:
 
     - name: 配置ccache缓存
       run: |
-        echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> $GITHUB_ENV
-        mkdir -p $CCACHE_DIR
-        ccache -M 20G  # 设置20GB缓存
-        ccache -o compression=true  # 启用压缩
+        # 首先创建缓存目录
+        CCACHE_DIR="$GITHUB_WORKSPACE/.ccache"
+        mkdir -p "$CCACHE_DIR"
+    
+        # 然后设置环境变量
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+    
+        # 配置ccache
+        ccache -M 20G
+        ccache -o compression=true
         echo "ℹ️ ccache缓存已配置，目录: $CCACHE_DIR"
 
     # 优化的缓存策略：使用分支名作为键，提高缓存命中率
