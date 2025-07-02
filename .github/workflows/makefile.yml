@@ -1,37 +1,61 @@
-name: Auto kernel build
-on: [push, pull_request]
+name: Android Kernel CI - Fixed ARM64
+on: [push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ARCH: arm64
+      SUBARCH: arm
+    
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Install ARM64 Toolchain
-        run: |
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu \
-            libc6-dev-arm64-cross
+    - name: Fix Ubuntu Repository
+      run: |
+        # 关键：更换为支持ARM64的软件源
+        sudo sed -i 's|azure\.|us.|g' /etc/apt/sources.list
+        sudo sed -i 's|http://|https://|g' /etc/apt/sources.list
+        sudo sed -i 's|/ubuntu|/ubuntu-ports|g' /etc/apt/sources.list  # 为ARM64启用ubuntu-ports源
+        echo "deb [arch=arm64] https://ports.ubuntu.com/ubuntu-ports noble main" | sudo tee -a /etc/apt/sources.list.d/arm64.list
+        sudo dpkg --add-architecture arm64
+        sudo apt update -o APT::Architectures::=amd64 -o APT::Architectures::=arm64
 
-      - name: Build Kernel
-        env:
-          ARCH: arm64
-          CROSS_COMPILE: aarch64-linux-gnu-
-        run: |
-          make -j$(nproc) O=out \
-            CC="ccache clang" \
-            LD=aarch64-linux-gnu-ld \
-            CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
-            KCFLAGS="--sysroot=/usr/aarch64-linux-gnu -Wno-unused-variable" \
-            evergo_defconfig
+    - name: Install ARM64 Toolchain
+      run: |
+        sudo apt install -y --no-install-recommends \
+          gcc-aarch64-linux-gnu \
+          binutils-aarch64-linux-gnu \
+          libc6-dev-arm64-cross \
+          clang lld
 
-          make -j$(nproc) O=out
+    - name: Set CCache
+      run: |
+        sudo apt install -y ccache
+        echo "MAXSIZE=5G" >> $GITHUB_ENV
+        ccache -M $MAXSIZE
 
-      - name: Package Artifact
-        run: |
-          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-          zip -r AnyKernel3.zip AnyKernel3/
+    - name: Build Kernel
+      run: |
+        make -j$(nproc) O=out \
+          CC="ccache clang" \
+          LD=aarch64-linux-gnu-ld \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
+          KCFLAGS="--sysroot=/usr/aarch64-linux-gnu -Wno-error" \
+          evergo_defconfig
+        
+        make -j$(nproc) O=out
+
+    - name: Package Kernel
+      run: |
+        cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+        cd AnyKernel3 && zip -r9 ../AnyKernel3.zip . -x ".git*"
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Kernel-Zip
+        path: AnyKernel3.zip
