@@ -1,58 +1,73 @@
-name: Android Kernel CI - Fixed ARM64
+name: ARM64 Kernel CI (Pure Clang Cross-Compile)
 on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # 使用标准x86 Runner
     timeout-minutes: 45
-    env:
-      ARCH: arm64
-      SUBARCH: arm
-    
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Fix Ubuntu Repository
+    - name: Install Dependencies
       run: |
-        # 关键：更换为支持ARM64的软件源
-        sudo sed -i 's|azure\.|us.|g' /etc/apt/sources.list
-        sudo sed -i 's|http://|https://|g' /etc/apt/sources.list
-        sudo sed -i 's|/ubuntu|/ubuntu-ports|g' /etc/apt/sources.list  # 为ARM64启用ubuntu-ports源
-        echo "deb [arch=arm64] https://ports.ubuntu.com/ubuntu-ports noble main" | sudo tee -a /etc/apt/sources.list.d/arm64.list
-        sudo dpkg --add-architecture arm64
-        sudo apt update -o APT::Architectures::=amd64 -o APT::Architectures::=arm64
+        sudo apt update
+        sudo apt install -y \
+          build-essential \
+          clang-18 \
+          lld-18 \
+          libssl-dev \
+          libelf-dev \
+          flex \
+          bison \
+          bc \
+          ccache
 
-    - name: Install ARM64 Toolchain
+    - name: Prepare Clang Environment
       run: |
-        sudo apt install -y --no-install-recommends \
-          gcc-aarch64-linux-gnu \
-          binutils-aarch64-linux-gnu \
-          libc6-dev-arm64-cross \
-          clang lld
-
-    - name: Set CCache
-      run: |
-        sudo apt install -y ccache
-        echo "MAXSIZE=5G" >> $GITHUB_ENV
-        ccache -M $MAXSIZE
-
-    - name: Build Kernel
-      run: |
-        make -j$(nproc) O=out \
-          CC="ccache clang" \
-          LD=aarch64-linux-gnu-ld \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
-          KCFLAGS="--sysroot=/usr/aarch64-linux-gnu -Wno-error" \
-          evergo_defconfig
+        # 配置LLVM符号链接
+        sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+        sudo ln -sf /usr/bin/lld-18 /usr/bin/ld.lld
         
-        make -j$(nproc) O=out
+        # 配置ccache
+        sudo mkdir -p /usr/lib/ccache
+        sudo ln -sf /usr/bin/ccache /usr/lib/ccache/clang
+
+    - name: Build Kernel (ARM64 Cross-Compile)
+      env:
+        ARCH: arm64
+        SUBARCH: arm
+      run: |
+        # 纯Clang交叉编译命令
+        make -j32 O=out \
+          CC="ccache clang" \
+          LD=ld.lld \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          LLVM_IAS=1 \
+          KCFLAGS="--target=aarch64-linux-gnu \
+                   -Wno-unused-but-set-variable \
+                   -Wno-implicit-function-declaration \
+                   KCFLAGS="--target=aarch64-linux-gnu \
+                   -Wno-unused-but-set-variable \
+                   -Wno-implicit-function-declaration \
+                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label -fno-PIE" \
+          evergo_defconfig
+
+        make -j32 O=out \
+          CC="ccache clang" \
+          LD=ld.lld \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          LLVM_IAS=1 \
+          KCFLAGS="--target=aarch64-linux-gnu \
+                   -Wno-unused-but-set-variable \
+                   -Wno-implicit-function-declaration \
+                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label -fno-PIE"
 
     - name: Package Kernel
       run: |
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-        cd AnyKernel3 && zip -r9 ../AnyKernel3.zip . -x ".git*"
+        zip -r9 AnyKernel3.zip AnyKernel3/
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
