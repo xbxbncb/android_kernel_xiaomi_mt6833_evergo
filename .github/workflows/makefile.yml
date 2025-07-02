@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # 使用标准x86 Runner
+    runs-on: ubuntu-latest
     strategy:
       matrix: 
         branch: ['main', 'ksu']
@@ -27,8 +27,8 @@ jobs:
         sudo apt update
         sudo apt install -y \
           build-essential \
-          clang-18 \
-          lld-18 \
+          clang \
+          lld \
           libssl-dev \
           libelf-dev \
           flex \
