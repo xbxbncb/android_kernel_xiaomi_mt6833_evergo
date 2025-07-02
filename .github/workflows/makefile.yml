@@ -29,7 +29,7 @@ jobs:
            zip AnyKernel3.zip AnyKernel3.zip
 
     - name: Upload AnyKernel3.zip
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
             name: AnyKernel3.zip
             path: AnyKernel3.zip
