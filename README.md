@@ -53,8 +53,8 @@ CLANG_TRIPLE=aarch64-linux-gnu- \
 LD=ld.lld \
 KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
 make -j$(nproc) O=out evergo_defconfig
-
-
+```
+```
 #配置配置(如果您有开启docker等功能的需要，若没有请不要执行)
 #ARCH=arm64 \
 CROSS_COMPILE=aarch64-linux-gnu- \
@@ -65,8 +65,8 @@ CLANG_TRIPLE=aarch64-linux-gnu- \
 LD=ld.lld \
 KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
 make menuconfig -j$(nproc) O=out
-
-
+```
+```
 #开始编译
 ARCH=arm64 \
 CROSS_COMPILE=aarch64-linux-gnu- \
