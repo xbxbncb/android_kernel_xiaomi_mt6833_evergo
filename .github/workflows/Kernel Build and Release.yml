@@ -16,7 +16,7 @@ jobs:
     - name: 生成发布标签
       id: generate_tag
       run: |
-          TAG_SUFFIX=$(date -u +"%Y %m %dT %H %M %SZ")
+          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
           echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
           echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
 
@@ -28,7 +28,7 @@ jobs:
         name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
         body: |
           ### 🚀 内核构建详情
-          - **构建日期**: $(date)
+          - **构建日期**: $(date -u +"%Y %m %dT %H %M %SZ")
           - **提交SHA**: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
           - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
           - **构建ID**: ${{ github.run_id }}
