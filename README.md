@@ -39,19 +39,6 @@ LD=ld.lld \
 KCFLAGS="-Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
 -j$(($(nproc) + 1)) evergo_defconfig
 ```
-#配置配置(如果您有开启docker等功能的需要，若没有请不要执行)
-
-```
-#make ARCH=arm64 \
-#CROSS_COMPILE=aarch64-linux-gnu- \
-#CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-#CC="ccache clang" \
-#CCACHE_DIR="/home/c/.ccache" \
-#CLANG_TRIPLE=aarch64-linux-gnu- \
-#LD=ld.lld \
-#KCFLAGS="-Wno-error=unused-but-set-variable -Wno-implicit-function-declaration" \
-# menuconfig -j$(nproc) O=out
-```
 #开始编译
 ```
 make ARCH=arm64 \
