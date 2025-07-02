@@ -20,9 +20,9 @@ jobs:
         apt update && apt install -y \
         bc bison build-essential ccache clang cpio curl flex git \
         gnupg gperf imagemagick libelf-dev liblz4-tool libncurses5-dev \
-        libsdl1.2-dev libssl-dev libxml2-utils lzop pngcrush python3 \
+        libsdl1.2-dev libssl-dev libxml2-utils  lzop pngcrush python3 \
         schedtool squashfs-tools xsltproc zip zlib1g-dev \
-        lld make && apt clean
+        lld rsync make && apt clean
 
     - name: 配置ccache缓存
       run: |
