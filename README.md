@@ -54,7 +54,7 @@ make ARCH=arm64 \
 ![image](https://github.com/user-attachments/assets/be3bf50f-bf1d-4643-ab5b-022fa075c92d)
 
 
-重新编译：
+重新编译需要先清理：
 ```
 make clean
 make mrproper
