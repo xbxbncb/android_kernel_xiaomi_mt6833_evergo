@@ -26,10 +26,16 @@ jobs:
 
     - name: 配置ccache缓存
       run: |
-        echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> $GITHUB_ENV
-        mkdir -p $CCACHE_DIR
-        ccache -M 20G  # 设置20GB缓存
-        ccache -o compression=true  # 启用压缩
+        # 首先创建缓存目录
+        CCACHE_DIR="$GITHUB_WORKSPACE/.ccache"
+        mkdir -p "$CCACHE_DIR"
+    
+        # 然后设置环境变量
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+    
+        # 配置ccache
+        ccache -M 20G
+        ccache -o compression=true
         echo "ℹ️ ccache缓存已配置，目录: $CCACHE_DIR"
 
     # 优化的缓存策略：使用分支名作为键，提高缓存命中率
@@ -121,7 +127,7 @@ jobs:
         echo "ℹ️ 内核镜像已复制到AnyKernel3目录"
         
         # # 添加构建信息
-        # echo "Kernel Version: $(date +%Y%m%d)" > AnyKernel3/version
+        # echo "Kernel Version: $(date +%Y-%m-%d)" > AnyKernel3/version
         # echo "Build ID: $GITHUB_RUN_ID" >> AnyKernel3/version
         # echo "Commit SHA: $GITHUB_SHA" >> AnyKernel3/version
         
@@ -163,18 +169,26 @@ jobs:
           build_logs.tar.gz
         retention-days: 7  # 保留7天
 
+
+    - name: 生成发布标签
+      id: generate_tag
+      run: |
+          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
+          echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
+          echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
+
     - name: 发布版本
       if: github.ref == 'refs/heads/main' && success()
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: kernel-$(date +%Y%m%d-%H%M)
-        name: 内核构建 #${{ github.run_number }}
+        tag_name: ${{ env.TAG_NAME }}  # 使用上面生成的标签
+        name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
         body: |
           ### 🚀 内核构建详情
           - **构建日期**: $(date)
-          - **提交SHA**: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
           - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
           - **构建ID**: ${{ github.run_id }}
+          - **发布标签**: ${{ env.TAG_NAME }}
           
           ### 📲 安装说明
           1. 下载 `anykernel_flashable.zip`
@@ -196,3 +210,4 @@ jobs:
         draft: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
