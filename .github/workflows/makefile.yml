@@ -76,6 +76,11 @@ jobs:
         path: ${{ env.CCACHE_DIR }}
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
     
+    - name: Initialize KernelSU
+      if: ${{matrix.branch == 'ksu'}} |
+      run: git submodule init
+           git submodule update
+    
     - name: Build Kernel (ARM64 Cross-Compile)
       run: |
         make -j32 O=out \
