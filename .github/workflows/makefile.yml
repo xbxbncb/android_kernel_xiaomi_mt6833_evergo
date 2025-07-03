@@ -116,6 +116,17 @@ jobs:
         git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         cd AnyKernel3
+
+        sed -i 's/device\.name1=.*/device.name1=evergo/' anykernel.sh
+        sed -i '/device\.name[2-5]=.*/d' anykernel.sh
+        if [ ${{matrix.branch }} == ksu ]; then
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU and SUSFS 4.14.336 by 酷安@孤独不能/' anykernel.sh
+        else
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel 4.14.336 by 酷安@孤独不能/' anykernel.sh
+        fi
+        sed -i 's/BLOCK=.*/BLOCK=boot/' anykernel.sh
+        sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto/' anykernel.sh
+        
         zip -r ../AnyKernel3-${{ matrix.branch }}.zip *
         cd ..
 
