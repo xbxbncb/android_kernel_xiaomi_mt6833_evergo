@@ -9,7 +9,7 @@ gperf imagemagick liblz4-tool libncurses6 libncurses5-dev libsdl1.2-dev \
 libxml2 libxml2-utils lzop pngcrush rsync schedtool \
 squashfs-tools xsltproc zip zlib1g-dev gcc-aarch64-linux-gnu
 ```
-###2. 开始编译
+### 2. 开始编译
 配置 ccache（二次编译时加速）
 ```
 #开启 ccache
