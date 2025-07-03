@@ -58,6 +58,11 @@ jobs:
           zip \
           zlib1g-dev \
           gcc-aarch64-linux-gnu
+   
+    - name: Set swap to 10G
+      uses: pierotofy/set-swap-space@master
+      with:
+        swap-size-gb: 10
 
     - name: Configure ccache
       run: |
