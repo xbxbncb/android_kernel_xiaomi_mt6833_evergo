@@ -109,7 +109,7 @@ jobs:
     - name: Upload AnyKernel3.zip
       uses: actions/upload-artifact@v4
       with:
-        name: AnyKernel3-${{ matrix.branch }}
+        name: AnyKernel3-${{ matrix.branch }}.zip
         path: AnyKernel3-${{ matrix.branch }}.zip
 
     - name: Save ccache
