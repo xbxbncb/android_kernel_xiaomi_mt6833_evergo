@@ -14,10 +14,10 @@ jobs:
       fail-fast: false
     timeout-minutes: 45
     env:
-      ARCH: arm64
-      SUBARCH: arm
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 20G
+      ARCH: arm64
+      SUBARCH: arm
 
     steps:
     - name: Checkout branch
@@ -25,24 +25,20 @@ jobs:
       with:
         ref: ${{ matrix.branch }}
 
-    - name: Install Dependencies & Toolchain
+    - name: Install dependencies & toolchain
       run: |
         sudo apt update
-        sudo apt install -y \
-          build-essential clang lld libssl-dev libelf-dev flex bison bc ccache \
-          curl git git-lfs gnupg gperf imagemagick liblz4-tool libncurses6 \
-          libncurses5-dev libsdl1.2-dev libxml2 libxml2-utils lzop pngcrush rsync \
-          schedtool squashfs-tools xsltproc zip zlib1g-dev gcc-aarch64-linux-gnu
+        sudo apt install -y build-essential clang lld libssl-dev libelf-dev flex bison bc ccache curl git git-lfs gnupg gperf imagemagick liblz4-tool libncurses6 libncurses5-dev libsdl1.2-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev gcc-aarch64-linux-gnu
 
     - name: Set swap to 10G
       uses: pierotofy/set-swap-space@master
       with:
         swap-size-gb: 10
 
-    - name: Setup ccache
+    - name: Configure ccache
       run: |
         mkdir -p $CCACHE_DIR
-        echo "max_size = $CCACHE_MAXSIZE" > $CCACHE_DIR/ccache.conf
+        echo "max_size = $CCACHE_MAXSIZE"
         sudo chmod -R 777 $CCACHE_DIR
 
     - name: Restore ccache
@@ -50,16 +46,14 @@ jobs:
       with:
         path: ${{ env.CCACHE_DIR }}
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
-        restore-keys: |
-          kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-
 
-    - name: Initialize KernelSU (if ksu)
-      if: matrix.branch == 'ksu'
+    - name: Initialize KernelSU (only for ksu branch)
+      if: ${{ matrix.branch == 'ksu' }}
       run: |
         git submodule init
         git submodule update
 
-    - name: Build Kernel
+    - name: Build kernel
       run: |
         make -j$(nproc) O=out \
           CC="ccache clang" \
@@ -69,10 +63,7 @@ jobs:
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           LLVM_IAS=1 \
-          KCFLAGS="--target=aarch64-linux-gnu \
-                   -Wno-unused-but-set-variable \
-                   -Wno-implicit-function-declaration \
-                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
+          KCFLAGS="--target=aarch64-linux-gnu -Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           evergo_defconfig
 
         make -j$(nproc) O=out \
@@ -83,29 +74,32 @@ jobs:
           CROSS_COMPILE_COMPAT=aarch64-linux-gnueabi- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           LLVM_IAS=1 \
-          KCFLAGS="--target=aarch64-linux-gnu \
-                   -Wno-unused-but-set-variable \
-                   -Wno-implicit-function-declaration \
-                   -Wno-unused-variable -Wno-unused-function -Wno-unused-label"
+          KCFLAGS="--target=aarch64-linux-gnu -Wno-unused-but-set-variable -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-function -Wno-unused-label"
 
-    - name: Package Kernel
+    - name: Package kernel with AnyKernel3
       run: |
-        git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
 
-        # 替换 anykernel.sh 设备代号
-        sed -i 's/device\.name1=.*/device.name1=evergo/' AnyKernel3/anykernel.sh
-        for i in 2 3 4 5; do sed -i "s/device\.name$i=.*/device.name$i=/" AnyKernel3/anykernel.sh; done
+        # 修复 anykernel.sh 内容
+        sed -i 's/^device\.name1=.*/device.name1=evergo/' AnyKernel3/anykernel.sh
+        sed -i 's/^device\.name[2-5]=.*/device.name2=\ndevice.name3=\ndevice.name4=\ndevice.name5=/' AnyKernel3/anykernel.sh
+        sed -i 's|^BLOCK=.*omap.*|BLOCK=boot;|' AnyKernel3/anykernel.sh
 
-        cd AnyKernel3
-        zip -r9 ../AnyKernel3-${{ matrix.branch }}.zip *
-        cd ..
+        zip -r9 AnyKernel3-${{ matrix.branch }}.zip AnyKernel3/*
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
+    - name: Upload release to GitHub
+      uses: softprops/action-gh-release@v1
       with:
-        name: AnyKernel3-${{ matrix.branch }}
-        path: AnyKernel3-${{ matrix.branch }}.zip
+        tag_name: kernel-release-${{ github.run_id }}
+        name: Kernel Build - ${{ github.run_id }}
+        body: |
+          构建分支：${{ matrix.branch }}
+          上传者：${{ github.actor }}
+          构建时间：${{ github.event.head_commit.timestamp }}
+        files: AnyKernel3-${{ matrix.branch }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Save ccache
       uses: actions/cache/save@v3
@@ -113,42 +107,5 @@ jobs:
         path: ${{ env.CCACHE_DIR }}
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ github.run_id }}
 
-  upload:
-    name: Publish Release
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: release_files
-
-    - name: Flatten & rename
-      run: |
-        mkdir -p zips
-        mv release_files/AnyKernel3-main/AnyKernel3-main.zip zips/
-        mv release_files/AnyKernel3-ksu/AnyKernel3-ksu.zip zips/
-
-    - name: Get timestamp
-      id: time
-      run: echo "timestamp=$(date -u +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_OUTPUT
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: latest-evergo
-        name: Evergo Kernel Build - ${{ steps.time.outputs.timestamp }}
-        body: |
-          自动构建刷机包（上传者：${{ github.actor }}）
-
-          分支构建：
-          - main
-          - ksu
-
-          时间：${{ steps.time.outputs.timestamp }}
-        files: |
-          zips/AnyKernel3-main.zip
-          zips/AnyKernel3-ksu.zip
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Show ccache stats
+      run: ccache -s
