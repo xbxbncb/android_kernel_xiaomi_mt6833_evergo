@@ -5,7 +5,7 @@
 ```
 sudo apt update && sudo apt install -y build-essential clang lld \
 libssl-dev libelf-dev flex bison bc ccache curl git git-lfs gnupg \
-gperf imagemagick liblz4-tool libncurses6 libncurses5-dev libsdl1.2-dev \
+gperf imagemagick liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev \
 libxml2 libxml2-utils lzop pngcrush rsync schedtool \
 squashfs-tools xsltproc zip zlib1g-dev gcc-aarch64-linux-gnu
 ```
@@ -33,6 +33,11 @@ make -j$(nproc --all) O=out \
                    -Wno-implicit-function-declaration \
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           evergo_defconfig
+```
+编译 ksu 支线还要多两步
+```
+git submodule init
+git submodule update
 ```
 正式编译
 ```
