@@ -1,4 +1,5 @@
 name: Auto Kernel Builder
+
 on:
   push:
     branches: [main, ksu]
@@ -19,12 +20,12 @@ jobs:
       CCACHE_MAXSIZE: 20G
 
     steps:
-    - name: Checkout ${{ matrix.branch }} branch
+    - name: Checkout branch
       uses: actions/checkout@v4
       with:
         ref: ${{ matrix.branch }}
 
-    - name: Install Dependencies & toolchain
+    - name: Install Dependencies & Toolchain
       run: |
         sudo apt update
         sudo apt install -y \
@@ -38,7 +39,7 @@ jobs:
       with:
         swap-size-gb: 10
 
-    - name: Configure ccache
+    - name: Setup ccache
       run: |
         mkdir -p $CCACHE_DIR
         echo "max_size = $CCACHE_MAXSIZE" > $CCACHE_DIR/ccache.conf
@@ -52,13 +53,13 @@ jobs:
         restore-keys: |
           kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-
 
-    - name: Initialize KernelSU submodule (if ksu branch)
+    - name: Initialize KernelSU (if ksu)
       if: matrix.branch == 'ksu'
       run: |
         git submodule init
         git submodule update
 
-    - name: Build Kernel (ARM64 Cross-Compile)
+    - name: Build Kernel
       run: |
         make -j$(nproc) O=out \
           CC="ccache clang" \
@@ -91,18 +92,63 @@ jobs:
       run: |
         git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+
+        # 替换 anykernel.sh 设备代号
+        sed -i 's/device\.name1=.*/device.name1=evergo/' AnyKernel3/anykernel.sh
+        for i in 2 3 4 5; do sed -i "s/device\.name$i=.*/device.name$i=/" AnyKernel3/anykernel.sh; done
+
         cd AnyKernel3
-        zip -r ../AnyKernel3-${{ matrix.branch }}.zip *
+        zip -r9 ../AnyKernel3-${{ matrix.branch }}.zip *
         cd ..
 
-    - name: Upload AnyKernel3.zip
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: AnyKernel3-${{ matrix.branch }}.zip
+        name: AnyKernel3-${{ matrix.branch }}
         path: AnyKernel3-${{ matrix.branch }}.zip
 
     - name: Save ccache
-      uses: actions/cache@v3
+      uses: actions/cache/save@v3
       with:
         path: ${{ env.CCACHE_DIR }}
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ github.run_id }}
+
+  upload:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release_files
+
+    - name: Flatten & rename
+      run: |
+        mkdir -p zips
+        mv release_files/AnyKernel3-main/AnyKernel3-main.zip zips/
+        mv release_files/AnyKernel3-ksu/AnyKernel3-ksu.zip zips/
+
+    - name: Get timestamp
+      id: time
+      run: echo "timestamp=$(date -u +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: latest-evergo
+        name: Evergo Kernel Build - ${{ steps.time.outputs.timestamp }}
+        body: |
+          自动构建刷机包（上传者：${{ github.actor }}）
+
+          分支构建：
+          - main
+          - ksu
+
+          时间：${{ steps.time.outputs.timestamp }}
+        files: |
+          zips/AnyKernel3-main.zip
+          zips/AnyKernel3-ksu.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
