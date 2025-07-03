@@ -109,7 +109,9 @@ jobs:
       run: |
         git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-        zip -r9 AnyKernel3-${{ matrix.branch }}.zip AnyKernel3/*
+        cd AnyKernel3
+        zip -r ../AnyKernel3-${{ matrix.branch }}.zip *
+        cd ..
 
     - name: Upload AnyKernel3.zip
       uses: actions/upload-artifact@v4
