@@ -39,7 +39,6 @@ jobs:
           ccache \
           curl \
           git \
-          git-lfs \
           gnupg \
           gperf \
           imagemagick \
