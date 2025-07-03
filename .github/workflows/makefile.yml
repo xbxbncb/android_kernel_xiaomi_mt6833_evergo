@@ -78,8 +78,9 @@ jobs:
     
     - name: Initialize KernelSU
       if: ${{matrix.branch == 'ksu'}} |
-      run: git submodule init
-           git submodule update
+      run: |
+        git submodule init
+        git submodule update
     
     - name: Build Kernel (ARM64 Cross-Compile)
       run: |
