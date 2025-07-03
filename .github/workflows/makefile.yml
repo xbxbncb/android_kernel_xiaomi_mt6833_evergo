@@ -101,15 +101,55 @@ jobs:
 
     - name: Package Kernel
       run: |
-        git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git 
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-        zip -r9 AnyKernel3-${{ matrix.branch }}.zip AnyKernel3/
-
+        zip -r9 AnyKernel3-${{ matrix.branch }}.zip AnyKernel3/*
+        
     - name: Upload AnyKernel3.zip
       uses: actions/upload-artifact@v4
       with:
         name: AnyKernel3-${{ matrix.branch }}
         path: AnyKernel3-${{ matrix.branch }}.zip
+    
+    - name: 生成发布标签
+      id: generate_tag
+      run: |
+          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
+          echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
+          echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
+
+    - name: 发布版本
+      if: github.ref == 'refs/heads/main' && success()
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.TAG_NAME }}  # 使用上面生成的标签
+        name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
+        body: |
+          ### 🚀 内核构建详情
+          - **构建日期**: $(date)
+          - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
+          - **构建ID**: ${{ github.run_id }}
+          - **发布标签**: ${{ env.TAG_NAME }}
+          
+          ### 📲 安装说明
+          1. 下载 `anykernel_flashable.zip`
+          2. 重启进入恢复模式 (推荐使用TWRP)
+          3. 刷入ZIP文件
+          4. 重启系统
+          
+          ### 📁 构建产物
+          - `kernel_artifacts.tar.gz`: 原始内核产物 (包含内核镜像和配置文件)
+          - `anykernel_flashable.zip`: 可直接刷入的刷机包
+          
+          ### ℹ️ 注意事项
+          - 请确保设备兼容性后再刷入
+          - 刷机前建议备份重要数据
+        files: |
+          AnyKernel3-${{ matrix.branch }}
+        draft: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
 
     - name: Save ccache
       uses: actions/cache/save@v3
