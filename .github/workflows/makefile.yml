@@ -1,14 +1,14 @@
-name: Auto Kernel Builer
+name: Auto Kernel Builder
 on:
-   push:
-      branches: [main,ksu]
-   workflow_dispatch:
+  push:
+    branches: [main, ksu]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      matrix: 
+      matrix:
         branch: ['main', 'ksu']
       fail-fast: false
     timeout-minutes: 45
@@ -19,60 +19,38 @@ jobs:
       SUBARCH: arm
 
     steps:
-    - name: Checkout ${{ matrix.branch }} branch Code
+    - name: Checkout ${{ matrix.branch }} branch
       uses: actions/checkout@v4
       with:
         ref: ${{ matrix.branch }}
 
-    - name: Install Dependencies & toolchain
+    - name: Install Dependencies
       run: |
         sudo apt update
-        sudo apt install -y \
-          build-essential \
-          clang \
-          lld \
-          libssl-dev \
-          libelf-dev \
-          flex \
-          bison \
-          bc \
-          ccache \
-          curl \
-          git \
-          gnupg \
-          gperf \
-          imagemagick \
-          liblz4-tool \
-          libncurses6 \
-          libncurses5-dev \
-          libsdl1.2-dev \
-          libxml2 \
-          libxml2-utils \
-          lzop \
-          pngcrush \
-          rsync \
-          schedtool \
-          squashfs-tools \
-          xsltproc \
-          zip \
-          zlib1g-dev \
+        sudo apt install -y build-essential clang lld libssl-dev libelf-dev \
+          flex bison bc ccache curl git gnupg gperf imagemagick liblz4-tool \
+          libncurses6 libncurses5-dev libsdl1.2-dev libxml2 libxml2-utils \
+          lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
           gcc-aarch64-linux-gnu
 
     - name: Configure ccache
       run: |
         mkdir -p $CCACHE_DIR
-        echo "max_size = $CCACHE_MAXSIZE"
+        echo "max_size = $CCACHE_MAXSIZE" > $CCACHE_DIR/ccache.conf
         sudo chmod -R 777 $CCACHE_DIR
 
     - name: Restore ccache
-      uses: actions/cache@v3
+      uses: actions/cache@v4  # 升级到v4
       with:
         path: ${{ env.CCACHE_DIR }}
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
-    
-    - name: Build Kernel (ARM64 Cross-Compile)
+        restore-keys: |
+          kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-
+
+    - name: Build Kernel
       run: |
-        make -j32 O=out \
+        # 编译配置
+        make -j$(nproc) O=out \
           CC="ccache clang" \
           LD=ld.lld \
           CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -86,7 +64,8 @@ jobs:
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           evergo_defconfig
 
-        make -j32 O=out \
+        # 实际编译
+        make -j$(nproc) O=out \
           CC="ccache clang" \
           LD=ld.lld \
           CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -98,62 +77,53 @@ jobs:
                    -Wno-unused-but-set-variable \
                    -Wno-implicit-function-declaration \
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label"
+        
+        # 检查编译结果
+        if [ ! -f "out/arch/arm64/boot/Image.gz-dtb" ]; then
+          echo "❌ 编译失败：未找到内核镜像"
+          exit 1
+        fi
 
     - name: Package Kernel
       run: |
-        git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git 
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git
         cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         zip -r9 AnyKernel3-${{ matrix.branch }}.zip AnyKernel3/*
-        
-    - name: Upload AnyKernel3.zip
+
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: AnyKernel3-${{ matrix.branch }}
         path: AnyKernel3-${{ matrix.branch }}.zip
-    
-    - name: 生成发布标签
+
+    - name: Generate Release Tag
       id: generate_tag
       run: |
-          TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
-          echo "TAG_NAME=kernel-$TAG_SUFFIX" >> $GITHUB_ENV
-          echo "ℹ️ 生成的发布标签: kernel-$TAG_SUFFIX"
+        TAG_SUFFIX=$(date -u +"%Y%m%dT%H%M%SZ")
+        echo "TAG_NAME=kernel-${{ matrix.branch }}-$TAG_SUFFIX" >> $GITHUB_ENV
+        echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+        echo "ℹ️ Generated tag: $TAG_NAME"
 
-    - name: 发布版本
-      if: github.ref == 'refs/heads/main' && success()
+    - name: Create Release
+      if: ${{ success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ksu') }}
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ env.TAG_NAME }}  # 使用上面生成的标签
-        name: "内核构建 #${{ github.run_number }} (${{ env.TAG_NAME }})"
+        tag_name: ${{ env.TAG_NAME }}
+        name: "Kernel Build #${{ github.run_number }} (${{ matrix.branch }})"
         body: |
-          ### 🚀 内核构建详情
-          - **构建日期**: $(date)
-          - **构建日志**: [build_logs.tar.gz](build_logs.tar.gz)
-          - **构建ID**: ${{ github.run_id }}
-          - **发布标签**: ${{ env.TAG_NAME }}
+          ### 🚀 Kernel Build Details
+          - **Build Date**: ${{ env.BUILD_DATE }}
+          - **Build ID**: ${{ github.run_id }}
+          - **Release Tag**: ${{ env.TAG_NAME }}
+          - **Branch**: ${{ matrix.branch }}
           
-          ### 📲 安装说明
-          1. 下载 `anykernel_flashable.zip`
-          2. 重启进入恢复模式 (推荐使用TWRP)
-          3. 刷入ZIP文件
-          4. 重启系统
-          
-          ### 📁 构建产物
-          - `kernel_artifacts.tar.gz`: 原始内核产物 (包含内核镜像和配置文件)
-          - `anykernel_flashable.zip`: 可直接刷入的刷机包
-          
-          ### ℹ️ 注意事项
-          - 请确保设备兼容性后再刷入
-          - 刷机前建议备份重要数据
+          ### 📲 Installation
+          1. Download `AnyKernel3-${{ matrix.branch }}.zip`
+          2. Reboot to recovery (TWRP recommended)
+          3. Flash the ZIP
+          4. Reboot system
         files: |
-          AnyKernel3-${{ matrix.branch }}
+          AnyKernel3-${{ matrix.branch }}.zip
         draft: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-
-    - name: Save ccache
-      uses: actions/cache/save@v3
-      with:
-        path: ${{ env.CCACHE_DIR }}
-        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ github.run_id }}
-    
