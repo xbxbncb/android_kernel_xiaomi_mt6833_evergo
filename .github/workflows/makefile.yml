@@ -96,7 +96,7 @@ jobs:
                    -Wno-unused-but-set-variable \
                    -Wno-implicit-function-declaration \
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
-          evergo_defconfig
+          evergo_docker_defconfig
 
         make -j32 O=out \
           CC="ccache clang" \
