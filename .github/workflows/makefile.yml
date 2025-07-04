@@ -8,8 +8,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      matrix: 
-        branch: ['main', 'ksu']
+      matrix:
+        include:
+          - branch: 'main'
+            config: 'evergo_defconfig'
+            config_label: 'default'
+          - branch: 'ksu'
+            config: 'evergo_defconfig'
+            config_label: 'default'
+          - branch: 'ksu'
+            config: 'evergo_docker_defconfig'
+            config_label: 'docker'
       fail-fast: false
     timeout-minutes: 45
     env:
@@ -74,10 +83,10 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
+        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ matrix.config }}
     
     - name: Initialize KernelSU
-      if: ${{matrix.branch == 'ksu'}} |
+      if: ${{ matrix.branch == 'ksu' }}
       run: |
         git submodule init
         git submodule update
@@ -96,7 +105,7 @@ jobs:
                    -Wno-unused-but-set-variable \
                    -Wno-implicit-function-declaration \
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
-          evergo_defconfig
+          ${{ matrix.config }}
 
         make -j32 O=out \
           CC="ccache clang" \
@@ -119,26 +128,32 @@ jobs:
 
         sed -i 's/device\.name1=.*/device.name1=evergo/' anykernel.sh
         sed -i '/device\.name[2-5]=.*/d' anykernel.sh
-        if [ ${{matrix.branch }} == ksu ]; then
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU and SUSFS 4.14.336 by 酷安@孤独不能/' anykernel.sh
+        
+        # 根据分支和配置类型设置内核字符串
+        if [ "${{ matrix.branch }}" == "ksu" ]; then
+          if [ "${{ matrix.config_label }}" == "docker" ]; then
+            sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU and SUSFS 4.14.336 (Docker) by 酷安@孤独不能/' anykernel.sh
+          else
+            sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU and SUSFS 4.14.336 by 酷安@孤独不能/' anykernel.sh
+          fi
         else
           sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel 4.14.336 by 酷安@孤独不能/' anykernel.sh
         fi
+        
         sed -i 's/BLOCK=.*/BLOCK=boot/' anykernel.sh
         sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto/' anykernel.sh
         
-        zip -r ../AnyKernel3-${{ matrix.branch }}.zip *
+        zip -r ../AnyKernel3-${{ matrix.branch }}-${{ matrix.config_label }}.zip *
         cd ..
 
     - name: Upload AnyKernel3.zip
       uses: actions/upload-artifact@v4
       with:
-        name: AnyKernel3-${{ matrix.branch }}.zip
-        path: AnyKernel3-${{ matrix.branch }}.zip
+        name: AnyKernel3-${{ matrix.branch }}-${{ matrix.config_label }}.zip
+        path: AnyKernel3-${{ matrix.branch }}-${{ matrix.config_label }}.zip
 
     - name: Save ccache
       uses: actions/cache/save@v3
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ github.run_id }}
-    
+        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ matrix.config }}-${{ github.run_id }}
