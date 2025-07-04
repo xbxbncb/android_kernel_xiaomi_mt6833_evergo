@@ -28,9 +28,10 @@
 
 		platform_support_project = <20015 20016 20651 20652 20653 20654>;
 		platform_support_project_dir = <20015 20016 20651 20652 20653 20654>;
-		platform_support_project_commandline = "default_commandline","default_commandline","default_commandline","default_commandline","default_commandline","default_commandline";
+		platform_support_project_commandline = "default_commandline",\
+"default_commandline","default_commandline","default_commandline",\
+"default_commandline","default_commandline";
 		fw_update_in_probe_with_headfile;
-		
 		touchpanel,max-num-support = <10>;
 		touchpanel,tx-rx-num = <18 32>;
 		touchpanel,panel-coords = <720 1600>;
